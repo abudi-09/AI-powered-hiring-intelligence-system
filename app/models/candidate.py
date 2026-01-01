@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime
+from typing import TYPE_CHECKING
 
 from sqlalchemy import DateTime, String, func
 from sqlalchemy.dialects.postgresql import UUID
@@ -9,6 +10,12 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
 from app.models.skill import candidate_skills
+
+
+if TYPE_CHECKING:
+    from app.models.job import Job
+    from app.models.match import MatchScore
+    from app.models.skill import Skill
 
 
 class Candidate(Base):

@@ -2,12 +2,18 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime
+from typing import TYPE_CHECKING
 
 from sqlalchemy import DateTime, Float, ForeignKey, UniqueConstraint, func
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
+
+
+if TYPE_CHECKING:
+    from app.models.candidate import Candidate
+    from app.models.job import Job
 
 
 class MatchScore(Base):
