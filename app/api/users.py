@@ -29,7 +29,6 @@ async def list_users(
     result = await db.execute(select(User).order_by(User.created_at.desc()))
     return list(result.scalars().all())
 
-
 @router.post("/", response_model=UserRead, status_code=status.HTTP_201_CREATED)
 async def create_user(
     payload: UserCreate,
