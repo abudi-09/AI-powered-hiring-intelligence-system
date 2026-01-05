@@ -63,8 +63,6 @@ async def get_user(
     if user is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
     return user
-
-
 @router.patch("/{user_id}", response_model=UserRead)
 async def update_user(
     user_id: uuid.UUID,
