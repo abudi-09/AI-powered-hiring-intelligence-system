@@ -1,17 +1,13 @@
 from __future__ import annotations
-
 import uuid
-
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-
 from app.api.deps import get_current_user, role_required
 from app.core.security import get_password_hash
 from app.db.session import get_db
 from app.models.user import User, UserRole
 from app.schemas.user import UserCreate, UserRead, UserUpdate
-
 
 router = APIRouter(prefix="/users", tags=["users"])
 

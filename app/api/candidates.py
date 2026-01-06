@@ -1,12 +1,17 @@
 from __future__ import annotations
 
+import re
 import uuid
+from pathlib import Path
+from typing import Final
 
-from fastapi import APIRouter, Depends, HTTPException, status
+import anyio
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import role_required
+from app.core.config import settings
 from app.db.session import get_db
 from app.models.candidate import Candidate
 from app.models.skill import Skill
@@ -18,6 +23,33 @@ router = APIRouter(prefix="/candidates", tags=["candidates"])
 
 
 AllowedRoleDep = role_required(UserRole.Admin, UserRole.Recruiter, UserRole.HiringManager)
+
+
+_FILENAME_SAFE_RE: Final[re.Pattern[str]] = re.compile(r"[^A-Za-z0-9._-]+")
+
+
+def _safe_resume_filename(original_filename: str | None, candidate_id: uuid.UUID) -> str:
+    ext = ""
+    if original_filename:
+        ext = Path(original_filename).suffix
+        if len(ext) > 10:
+            ext = ""
+        ext = _FILENAME_SAFE_RE.sub("", ext)
+
+    return f"{candidate_id}_{uuid.uuid4().hex}{ext}"
+
+
+async def _write_upload_file(upload: UploadFile, destination: Path) -> None:
+    def _write_sync() -> None:
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        with destination.open("wb") as f:
+            while True:
+                chunk = upload.file.read(1024 * 1024)
+                if not chunk:
+                    break
+                f.write(chunk)
+
+    await anyio.to_thread.run_sync(_write_sync)
 
 
 @router.get("/", response_model=list[CandidateRead])
@@ -115,3 +147,28 @@ async def delete_candidate(
     await db.delete(candidate)
     await db.commit()
     return None
+
+
+@router.post("/{candidate_id}/resume", response_model=CandidateRead)
+async def upload_candidate_resume(
+    candidate_id: uuid.UUID,
+    resume: UploadFile = File(...),
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(AllowedRoleDep),
+) -> Candidate:
+    result = await db.execute(select(Candidate).where(Candidate.id == candidate_id))
+    candidate = result.scalar_one_or_none()
+    if candidate is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Candidate not found")
+
+    storage_root = settings.resume_storage_path
+    filename = _safe_resume_filename(resume.filename, candidate_id)
+    relative_path = Path(str(candidate_id)) / filename
+    full_path = storage_root / relative_path
+
+    await _write_upload_file(resume, full_path)
+
+    candidate.resume_path = relative_path.as_posix()
+    await db.commit()
+    await db.refresh(candidate)
+    return candidate

@@ -22,3 +22,8 @@ class MatchScoreUpsert(BaseModel):
     job_id: uuid.UUID
     score: float = Field(ge=0, le=100)
     explanation: dict | None = None
+
+
+class MatchAutoScoreRequest(BaseModel):
+    candidate_id: uuid.UUID
+    job_id: uuid.UUID
