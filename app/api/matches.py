@@ -12,7 +12,8 @@ from app.api.deps import role_required
 from app.db.session import get_db
 from app.models.candidate import Candidate
 from app.models.job import Job
-from app.models.skill import Skill, job_skills
+from app.models.job_skill import JobSkill
+from app.models.skill import Skill
 from app.models.match import MatchScore
 from app.models.user import User, UserRole
 from app.schemas.match import MatchAutoScoreRequest, MatchScoreRead, MatchScoreUpsert
@@ -114,9 +115,9 @@ async def auto_score_match(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Job not found")
 
     job_skills_result = await db.execute(
-        select(Skill.id, Skill.name, job_skills.c.weight)
-        .join(job_skills, job_skills.c.skill_id == Skill.id)
-        .where(job_skills.c.job_id == payload.job_id)
+        select(Skill.id, Skill.name, JobSkill.weight)
+        .join(JobSkill, JobSkill.skill_id == Skill.id)
+        .where(JobSkill.job_id == payload.job_id)
         .order_by(Skill.name.asc())
     )
 

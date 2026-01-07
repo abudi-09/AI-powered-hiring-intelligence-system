@@ -9,7 +9,7 @@ from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
-from app.models.skill import job_skills
+from app.models.job_skill import JobSkill
 
 
 if TYPE_CHECKING:
@@ -46,10 +46,11 @@ class Job(Base):
 
     owner: Mapped["User"] = relationship("User", back_populates="jobs")
 
-    skills: Mapped[list["Skill"]] = relationship(
-        "Skill",
-        secondary=job_skills,
-        back_populates="jobs",
+    skills: Mapped[list["JobSkill"]] = relationship(
+        "JobSkill",
+        back_populates="job",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
     )
 
     match_scores: Mapped[list["MatchScore"]] = relationship(

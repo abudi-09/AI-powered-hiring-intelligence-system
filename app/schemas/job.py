@@ -5,16 +5,15 @@ from datetime import datetime
 
 from pydantic import BaseModel, Field
 
-from app.schemas.skill import SkillRead
 
-
-class JobSkillIn(BaseModel):
+class JobSkillInput(BaseModel):
     skill_id: uuid.UUID
-    weight: float | None = Field(default=None, ge=0)
+    weight: float | None = Field(default=None, ge=0, le=1)
 
 
-class JobSkillOut(BaseModel):
-    skill: SkillRead
+class JobSkillRead(BaseModel):
+    skill_id: uuid.UUID
+    skill_name: str
     weight: float | None
 
 
@@ -23,7 +22,7 @@ class JobRead(BaseModel):
     title: str
     description: str | None
     owner_id: uuid.UUID
-    skills: list[JobSkillOut]
+    skills: list[JobSkillRead]
     created_at: datetime
     updated_at: datetime
 
@@ -31,10 +30,10 @@ class JobRead(BaseModel):
 class JobCreate(BaseModel):
     title: str = Field(min_length=1, max_length=255)
     description: str | None = Field(default=None)
-    skills: list[JobSkillIn] = Field(default_factory=list)
+    skills: list[JobSkillInput] | None = Field(default_factory=list)
 
 
 class JobUpdate(BaseModel):
     title: str | None = Field(default=None, min_length=1, max_length=255)
     description: str | None = None
-    skills: list[JobSkillIn] | None = None
+    skills: list[JobSkillInput] | None = None

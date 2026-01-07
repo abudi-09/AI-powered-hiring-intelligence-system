@@ -19,6 +19,7 @@ from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
+from app.models.job_skill import JobSkill
 
 
 if TYPE_CHECKING:
@@ -26,25 +27,7 @@ if TYPE_CHECKING:
     from app.models.job import Job
 
 
-job_skills = Table(
-    "job_skills",
-    Base.metadata,
-    Column("id", UUID(as_uuid=True), primary_key=True, default=uuid.uuid4),
-    Column(
-        "job_id",
-        UUID(as_uuid=True),
-        ForeignKey("jobs.id", ondelete="CASCADE"),
-        nullable=False,
-    ),
-    Column(
-        "skill_id",
-        UUID(as_uuid=True),
-        ForeignKey("skills.id", ondelete="CASCADE"),
-        nullable=False,
-    ),
-    Column("weight", Float, nullable=True),
-    UniqueConstraint("job_id", "skill_id", name="uq_job_skill"),
-)
+## JobSkill association now mapped as a model in app.models.job_skill
 
 
 candidate_skills = Table(
@@ -86,10 +69,11 @@ class Skill(Base):
         onupdate=func.now(),
     )
 
-    jobs: Mapped[list["Job"]] = relationship(
-        "Job",
-        secondary=job_skills,
-        back_populates="skills",
+    jobs: Mapped[list["JobSkill"]] = relationship(
+        "JobSkill",
+        back_populates="skill",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
     )
 
     candidates: Mapped[list["Candidate"]] = relationship(
