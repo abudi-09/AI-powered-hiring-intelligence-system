@@ -11,11 +11,15 @@ class SkillRead(BaseModel):
 
     id: uuid.UUID
     name: str
-    description: str | None
+    category: str | None
     created_at: datetime
-    updated_at: datetime
 
 
 class SkillCreate(BaseModel):
     name: str = Field(min_length=1, max_length=120)
-    description: str | None = Field(default=None, max_length=2000)
+    category: str | None = Field(default=None, max_length=120)
+
+
+class SkillUpdate(BaseModel):
+    name: str | None = Field(default=None, min_length=1, max_length=120)
+    category: str | None = Field(default=None, max_length=120)

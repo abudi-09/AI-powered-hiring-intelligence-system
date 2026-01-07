@@ -1,37 +1,54 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import select
+import uuid
+
+from fastapi import APIRouter, Depends, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import role_required
+from app.crud.skill import create_skill, delete_skill, get_skill_by_id, list_skills, update_skill
 from app.db.session import get_db
-from app.models.skill import Skill
 from app.models.user import User, UserRole
-from app.schemas.skill import SkillCreate, SkillRead
+from app.schemas.skill import SkillCreate, SkillRead, SkillUpdate
 
 
 router = APIRouter(prefix="/skills", tags=["skills"])
 
 
 @router.get("/", response_model=list[SkillRead])
-async def list_skills(db: AsyncSession = Depends(get_db)) -> list[Skill]:
-    result = await db.execute(select(Skill).order_by(Skill.name.asc()))
-    return list(result.scalars().all())
+async def skills_list(db: AsyncSession = Depends(get_db)):
+    return await list_skills(db)
+
+
+@router.get("/{skill_id}", response_model=SkillRead)
+async def skills_get(skill_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
+    return await get_skill_by_id(db, skill_id)
 
 
 @router.post("/", response_model=SkillRead, status_code=status.HTTP_201_CREATED)
 async def create_skill(
     payload: SkillCreate,
     db: AsyncSession = Depends(get_db),
-    _: User = Depends(role_required(UserRole.Admin, UserRole.Recruiter, UserRole.HiringManager)),
-) -> Skill:
-    existing = await db.execute(select(Skill).where(Skill.name == payload.name))
-    if existing.scalar_one_or_none() is not None:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Skill already exists")
+    _: User = Depends(role_required(UserRole.Admin)),
+):
+    return await create_skill(db, payload)
 
-    skill = Skill(name=payload.name, description=payload.description)
-    db.add(skill)
-    await db.commit()
-    await db.refresh(skill)
-    return skill
+
+@router.put("/{skill_id}", response_model=SkillRead)
+async def skills_update(
+    skill_id: uuid.UUID,
+    payload: SkillUpdate,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(role_required(UserRole.Admin)),
+):
+    return await update_skill(db, skill_id, payload)
+
+
+@router.delete("/{skill_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def skills_delete(
+    skill_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(role_required(UserRole.Admin)),
+):
+    await delete_skill(db, skill_id)
+    return None

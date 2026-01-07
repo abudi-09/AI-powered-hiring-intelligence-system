@@ -1,4 +1,4 @@
-# AI Powered Hiring Intelligence System
+# AI-Powered-Hiring-Intelligence-System
 
 AI-powered system that automates **candidate-job matching**, **skill extraction**, and **role-based management**. Built with **FastAPI**, **PostgreSQL**, and **async SQLAlchemy**. AI analyzes resumes and job descriptions to generate **match scores** and provide **recommendations** for recruiters and hiring managers.
 
@@ -18,8 +18,8 @@ AI-powered system that automates **candidate-job matching**, **skill extraction*
 ### 1. Clone the repository
 
 ```bash
-git clone https://github.com/<your-username>/AI-powered-hiring-intelligence-systems.git
-cd AI-powered-hiring-intelligence-systems
+git clone https://github.com/<your-username>/AI-Powered-Hiring-Intelligence-System.git
+cd AI-Powered-Hiring-Intelligence-System
 ```
 
 ### 2. Create virtual environment
@@ -86,9 +86,11 @@ How to get the token:
 #### `POST /auth/login` (Public)
 
 - **What it does:** Authenticates a user and returns a JWT.
-- **Request (JSON):**
+- **Request (x-www-form-urlencoded / form-data):**
+  - `username` (email)
+  - `password`
+- **Also supported (Postman-friendly JSON):**
   - `{ "email": "user@example.com", "password": "Password123" }`
-  - Also supports form fields (`email`/`username`, `password`) for OAuth2/Postman compatibility.
 - **Response:**
   - `{ "access_token": "...", "token_type": "bearer" }`
 
@@ -303,4 +305,4 @@ Match scores are stored in `match_scores` and are unique per `(candidate_id, job
 - Swagger UI: `GET /docs`
 - OpenAPI JSON: `GET /openapi.json`
 
-# AI-Powered-Hiring-Intelligence-Systems
+# AI-Powered-Hiring-Intelligence-System
