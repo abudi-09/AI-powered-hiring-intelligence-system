@@ -20,6 +20,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
 from app.models.job_skill import JobSkill
+from app.models.candidate_skill import CandidateSkill
 
 
 if TYPE_CHECKING:
@@ -30,24 +31,7 @@ if TYPE_CHECKING:
 ## JobSkill association now mapped as a model in app.models.job_skill
 
 
-candidate_skills = Table(
-    "candidate_skills",
-    Base.metadata,
-    Column("id", UUID(as_uuid=True), primary_key=True, default=uuid.uuid4),
-    Column(
-        "candidate_id",
-        UUID(as_uuid=True),
-        ForeignKey("candidates.id", ondelete="CASCADE"),
-        nullable=False,
-    ),
-    Column(
-        "skill_id",
-        UUID(as_uuid=True),
-        ForeignKey("skills.id", ondelete="CASCADE"),
-        nullable=False,
-    ),
-    UniqueConstraint("candidate_id", "skill_id", name="uq_candidate_skill"),
-)
+## CandidateSkill association now mapped as a model in app.models.candidate_skill
 
 
 class Skill(Base):
@@ -76,8 +60,17 @@ class Skill(Base):
         passive_deletes=True,
     )
 
+    # Direct association to CandidateSkill for management
+    candidate_links: Mapped[list["CandidateSkill"]] = relationship(
+        "CandidateSkill",
+        back_populates="skill",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+    )
+
+    # Convenience relationship to load candidates via secondary table
     candidates: Mapped[list["Candidate"]] = relationship(
         "Candidate",
-        secondary=candidate_skills,
-        back_populates="skills",
+        secondary=None,
+        viewonly=True,
     )

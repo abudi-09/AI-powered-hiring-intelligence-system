@@ -9,7 +9,7 @@ from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
-from app.models.skill import candidate_skills
+from app.models.candidate_skill import CandidateSkill
 
 
 if TYPE_CHECKING:
@@ -37,10 +37,20 @@ class Candidate(Base):
         onupdate=func.now(),
     )
 
+    # Direct association links for management
+    skill_links: Mapped[list["CandidateSkill"]] = relationship(
+        "CandidateSkill",
+        back_populates="candidate",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+    )
+
+    # Convenience relationship to load skills via secondary table
     skills: Mapped[list["Skill"]] = relationship(
         "Skill",
-        secondary=candidate_skills,
+        secondary=CandidateSkill.__table__,
         back_populates="candidates",
+        viewonly=True,
     )
 
     match_scores: Mapped[list["MatchScore"]] = relationship(
