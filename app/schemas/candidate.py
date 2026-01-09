@@ -5,7 +5,7 @@ from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
-from app.schemas.skill import SkillRead
+from app.schemas.candidate_skill import CandidateSkillInput, CandidateSkillRead
 
 
 class CandidateRead(BaseModel):
@@ -15,7 +15,7 @@ class CandidateRead(BaseModel):
     full_name: str
     email: str | None
     resume_path: str | None
-    skills: list[SkillRead]
+    skills: list[CandidateSkillRead]
     created_at: datetime
     updated_at: datetime
 
@@ -24,11 +24,11 @@ class CandidateCreate(BaseModel):
     full_name: str = Field(min_length=1, max_length=255)
     email: EmailStr | None = None
     resume_path: str | None = Field(default=None, max_length=1024)
-    skill_ids: list[uuid.UUID] = Field(default_factory=list)
+    skills: list[CandidateSkillInput] | None = Field(default_factory=list)
 
 
 class CandidateUpdate(BaseModel):
     full_name: str | None = Field(default=None, min_length=1, max_length=255)
     email: EmailStr | None = None
     resume_path: str | None = Field(default=None, max_length=1024)
-    skill_ids: list[uuid.UUID] | None = None
+    skills: list[CandidateSkillInput] | None = None

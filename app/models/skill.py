@@ -67,10 +67,3 @@ class Skill(Base):
         cascade="all, delete-orphan",
         passive_deletes=True,
     )
-
-    # Convenience relationship to load candidates via secondary table
-    candidates: Mapped[list["Candidate"]] = relationship(
-        "Candidate",
-        secondary=None,
-        viewonly=True,
-    )

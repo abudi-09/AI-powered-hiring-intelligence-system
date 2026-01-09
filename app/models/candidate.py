@@ -49,7 +49,6 @@ class Candidate(Base):
     skills: Mapped[list["Skill"]] = relationship(
         "Skill",
         secondary=CandidateSkill.__table__,
-        back_populates="candidates",
         viewonly=True,
     )
 
