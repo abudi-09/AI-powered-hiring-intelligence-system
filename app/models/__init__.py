@@ -1,10 +1,11 @@
 from app.models.candidate import Candidate
+from app.models.candidate_skill import CandidateSkill
+from app.models.insight import Insight
 from app.models.job import Job
 from app.models.job_skill import JobSkill
 from app.models.match import MatchScore
 from app.models.skill import Skill
 from app.models.user import User
-from app.models.candidate_skill import CandidateSkill
 
 __all__ = [
     "User",
@@ -14,4 +15,5 @@ __all__ = [
     "Candidate",
     "CandidateSkill",
     "MatchScore",
+    "Insight",
 ]
