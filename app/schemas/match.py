@@ -17,13 +17,18 @@ class MatchScoreRead(BaseModel):
     created_at: datetime
 
 
-class MatchScoreUpsert(BaseModel):
+class MatchScoreCreate(BaseModel):
     candidate_id: uuid.UUID
     job_id: uuid.UUID
     score: float = Field(ge=0, le=100)
     explanation: dict | None = None
 
 
-class MatchAutoScoreRequest(BaseModel):
+class MatchScoreAutoRequest(BaseModel):
     candidate_id: uuid.UUID
     job_id: uuid.UUID
+
+
+class MatchScoreList(BaseModel):
+    matches: list[MatchScoreRead]
+    total: int
