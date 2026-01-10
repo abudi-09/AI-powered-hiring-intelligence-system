@@ -28,3 +28,4 @@ class JobSkill(Base):
 
     job: Mapped["Job"] = relationship("Job", back_populates="skills")
     skill: Mapped["Skill"] = relationship("Skill", back_populates="jobs")
+

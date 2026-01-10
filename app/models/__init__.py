@@ -2,6 +2,13 @@ from app.models.candidate import Candidate
 from app.models.candidate_skill import CandidateSkill
 from app.models.conversation import ConversationMessage, ConversationSession
 from app.models.insight import Insight
+from app.models.intelligence import (
+    CandidateIntelligence,
+    JobIntelligence,
+    MatchIntelligence,
+    RecruiterPerformance,
+    SkillIntelligence,
+)
 from app.models.job import Job
 from app.models.job_skill import JobSkill
 from app.models.match import MatchScore
@@ -21,4 +28,9 @@ __all__ = [
     "Recommendation",
     "ConversationSession",
     "ConversationMessage",
+    "JobIntelligence",
+    "CandidateIntelligence",
+    "SkillIntelligence",
+    "MatchIntelligence",
+    "RecruiterPerformance",
 ]
