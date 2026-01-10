@@ -4,8 +4,6 @@ import uuid
 from enum import Enum
 
 from pydantic import BaseModel, Field
-
-
 class NarrativeTone(str, Enum):
     professional = "professional"
     executive = "executive"
