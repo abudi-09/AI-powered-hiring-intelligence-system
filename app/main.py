@@ -6,6 +6,8 @@ from app.api.candidates import router as candidates_router
 from app.api.insights import router as insights_router
 from app.api.jobs import router as jobs_router
 from app.api.matches import router as matches_router
+from app.api.narratives import router as narratives_router
+from app.api.recommendations import router as recommendations_router
 from app.api.skills import router as skills_router
 from app.api.users import router as users_router
 from app.core.config import settings
@@ -21,6 +23,8 @@ def create_app() -> FastAPI:
     app.include_router(matches_router)
     app.include_router(analytics_router)
     app.include_router(insights_router)
+    app.include_router(recommendations_router)
+    app.include_router(narratives_router)
     app.include_router(users_router)
 
     @app.on_event("startup")
