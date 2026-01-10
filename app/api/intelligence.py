@@ -119,7 +119,6 @@ async def generate_candidate_intelligence(
             detail=str(e),
         )
 
-
 # Skill Intelligence Routes
 @router.get(
     "/skill/{skill_id}",
