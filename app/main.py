@@ -3,6 +3,7 @@ from fastapi import FastAPI
 from app.api.analytics import router as analytics_router
 from app.api.auth import router as auth_router
 from app.api.candidates import router as candidates_router
+from app.api.chat import router as chat_router
 from app.api.insights import router as insights_router
 from app.api.jobs import router as jobs_router
 from app.api.matches import router as matches_router
@@ -25,6 +26,7 @@ def create_app() -> FastAPI:
     app.include_router(insights_router)
     app.include_router(recommendations_router)
     app.include_router(narratives_router)
+    app.include_router(chat_router)
     app.include_router(users_router)
 
     @app.on_event("startup")

@@ -13,6 +13,7 @@ from app.db.base import Base
 
 
 if TYPE_CHECKING:
+    from app.models.conversation import ConversationSession
     from app.models.job import Job
 
 
@@ -53,6 +54,13 @@ class User(Base):
     jobs: Mapped[list["Job"]] = relationship(
         "Job",
         back_populates="owner",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+    )
+
+    conversation_sessions: Mapped[list["ConversationSession"]] = relationship(
+        "ConversationSession",
+        back_populates="user",
         cascade="all, delete-orphan",
         passive_deletes=True,
     )

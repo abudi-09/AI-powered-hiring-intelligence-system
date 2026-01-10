@@ -1,5 +1,6 @@
 from app.models.candidate import Candidate
 from app.models.candidate_skill import CandidateSkill
+from app.models.conversation import ConversationMessage, ConversationSession
 from app.models.insight import Insight
 from app.models.job import Job
 from app.models.job_skill import JobSkill
@@ -18,4 +19,6 @@ __all__ = [
     "MatchScore",
     "Insight",
     "Recommendation",
+    "ConversationSession",
+    "ConversationMessage",
 ]
