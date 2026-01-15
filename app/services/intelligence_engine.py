@@ -67,9 +67,9 @@ class IntelligenceEngine:
 
         # Get match scores for this job
         match_scores_result = await db.execute(
-            select(MatchScore.score)
+            select(MatchScore.overall_score)
             .where(MatchScore.job_id == job_id)
-            .order_by(MatchScore.score.desc())
+            .order_by(MatchScore.overall_score.desc())
         )
         match_scores = [row[0] for row in match_scores_result.all()]
 
@@ -305,13 +305,11 @@ class IntelligenceEngine:
             scarcity_ratio = float(demand_count) if demand_count > 0 else 0.0
 
         # Get required levels for this skill in jobs
-        # Use JobSkill.weight (0-1) as required level proxy (scale to 0-100)
         job_levels_result = await db.execute(
-            select(JobSkill.weight)
+            select(JobSkill.required_level)
             .where(JobSkill.skill_id == skill_id)
         )
-        job_levels_raw = [row[0] for row in job_levels_result.all() if row[0] is not None]
-        job_levels = [min(max(w * 100.0, 0.0), 100.0) for w in job_levels_raw]
+        job_levels = [row[0] for row in job_levels_result.all()]
 
         # Calculate average required level
         avg_required_level = round(
@@ -319,13 +317,11 @@ class IntelligenceEngine:
         ) if job_levels else 0.0
 
         # Get candidate proficiency levels
-        # Use years_experience as candidate level proxy (scale years to 0-100)
         candidate_levels_result = await db.execute(
-            select(CandidateSkill.years_experience)
+            select(CandidateSkill.proficiency_level)
             .where(CandidateSkill.skill_id == skill_id)
         )
-        candidate_levels_raw = [row[0] for row in candidate_levels_result.all() if row[0] is not None]
-        candidate_levels = [min(x * 10.0, 100.0) for x in candidate_levels_raw]
+        candidate_levels = [row[0] for row in candidate_levels_result.all()]
 
         avg_candidate_level = round(
             sum(candidate_levels) / len(candidate_levels), 2
@@ -372,8 +368,8 @@ class IntelligenceEngine:
         """
         # Get all match scores
         match_scores_result = await db.execute(
-            select(MatchScore.score)
-            .order_by(MatchScore.score.desc())
+            select(MatchScore.overall_score)
+            .order_by(MatchScore.overall_score.desc())
         )
         all_scores = [row[0] for row in match_scores_result.all()]
 
