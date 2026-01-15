@@ -208,7 +208,6 @@ async def generate_match_intelligence(
     intelligence = await intelligence_crud.generate_match_intelligence(db)
     return intelligence
 
-
 # Recruiter Performance Routes
 @router.get(
     "/recruiter/{recruiter_id}",
@@ -220,8 +219,7 @@ async def get_recruiter_performance(
     db: Annotated[AsyncSession, Depends(get_db)],
     _: User = Depends(AllowedRoleDep),
 ) -> RecruiterPerformanceRead:
-    """Get recruiter performance analytics.
-    
+    """Get recruiter performance analytics.  
     Returns the latest performance metrics for a recruiter.
     """
     performance = await intelligence_crud.get_recruiter_performance(db, recruiter_id)
@@ -231,8 +229,6 @@ async def get_recruiter_performance(
             detail=f"Recruiter performance not found for recruiter {recruiter_id}",
         )
     return performance
-
-
 @router.post(
     "/generate/recruiter/{recruiter_id}",
     response_model=RecruiterPerformanceRead,
