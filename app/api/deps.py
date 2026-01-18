@@ -12,6 +12,8 @@ from app.core.security import decode_access_token
 from app.db.session import get_db
 from app.models.user import User, UserRole
 
+get_async_db = get_db
+
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/login")
 
