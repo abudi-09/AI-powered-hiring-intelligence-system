@@ -61,6 +61,15 @@ uvicorn app.main:app --reload
 alembic upgrade head
 ```
 
+Copy `.env.example` to `.env` and fill in your local values before running the app or tests.
+
+### 7. Run tests
+
+```bash
+pip install -r requirements.txt -r requirements-dev.txt
+python -m pytest tests/ -v
+```
+
 ## **Technologies Used**
 
 - **Backend:** FastAPI, Python 3.10+
