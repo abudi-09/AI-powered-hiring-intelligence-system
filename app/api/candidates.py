@@ -17,14 +17,22 @@ from app.models.candidate import Candidate
 from app.models.candidate_skill import CandidateSkill
 from app.models.skill import Skill
 from app.models.user import User, UserRole
-from app.schemas.candidate import CandidateCreate, CandidateRead, CandidateUpdate, CandidateSkillRead
 from app.crud.candidate import (
     create_candidate as crud_create_candidate,
     delete_candidate as crud_delete_candidate,
-    list_candidates as crud_list_candidates,
-    update_candidate as crud_update_candidate,
     get_candidate_by_id as crud_get_candidate_by_id,
+    list_candidates as crud_list_candidates,
+    merge_candidate_skills as crud_merge_candidate_skills,
+    update_candidate as crud_update_candidate,
 )
+from app.schemas.candidate import (
+    CandidateCreate,
+    CandidateRead,
+    CandidateUpdate,
+    CandidateSkillRead,
+    ResumeSkillExtractionRead,
+)
+from app.services.skill_extractor import SkillExtractor
 
 
 router = APIRouter(prefix="/candidates", tags=["candidates"])
@@ -160,3 +168,65 @@ async def upload_candidate_resume(
     await db.commit()
     await db.refresh(candidate)
     return await _candidate_to_read(db, candidate)
+
+
+@router.post("/{candidate_id}/skills/extract-from-resume", response_model=ResumeSkillExtractionRead)
+async def extract_skills_from_resume(
+    candidate_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(AllowedRoleDep),
+) -> ResumeSkillExtractionRead:
+    candidate = await crud_get_candidate_by_id(db, candidate_id)
+    if not candidate.resume_path:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Candidate has no uploaded resume",
+        )
+
+    resume_path = settings.resume_storage_path / candidate.resume_path
+    if not resume_path.is_file():
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Resume file not found on disk",
+        )
+
+    try:
+        resume_text = resume_path.read_text(encoding="utf-8")
+    except UnicodeDecodeError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Resume must be UTF-8 plain text for skill extraction",
+        ) from exc
+
+    skills_result = await db.execute(select(Skill.id, Skill.name).order_by(Skill.name))
+    skill_rows = skills_result.all()
+    skill_name_to_id = {name: skill_id for skill_id, name in skill_rows}
+
+    extractor = SkillExtractor()
+    extracted = extractor.extract_from_text(
+        resume_text,
+        [name for _, name in skill_rows],
+    )
+    if not extracted:
+        return ResumeSkillExtractionRead(
+            extracted_count=0,
+            candidate=await _candidate_to_read(db, candidate),
+        )
+
+    merge_payload = [
+        {
+            "skill_id": skill_name_to_id[item.skill_name],
+            "level": item.level,
+            "years_experience": item.years_experience,
+        }
+        for item in extracted
+        if item.skill_name in skill_name_to_id
+    ]
+    await crud_merge_candidate_skills(db, candidate, merge_payload)
+    await db.commit()
+    await db.refresh(candidate)
+
+    return ResumeSkillExtractionRead(
+        extracted_count=len(merge_payload),
+        candidate=await _candidate_to_read(db, candidate),
+    )

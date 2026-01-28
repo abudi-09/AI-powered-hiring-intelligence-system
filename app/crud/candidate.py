@@ -108,6 +108,37 @@ async def update_candidate(db: AsyncSession, candidate_id: uuid.UUID, payload: C
     return candidate
 
 
+async def merge_candidate_skills(
+    db: AsyncSession,
+    candidate: Candidate,
+    skills: list[dict],
+) -> None:
+    if not skills:
+        return
+
+    await _validate_skills_exist(db, [item["skill_id"] for item in skills])
+    existing_by_skill = {link.skill_id: link for link in candidate.skill_links}
+
+    for item in skills:
+        skill_id = item["skill_id"]
+        existing = existing_by_skill.get(skill_id)
+        if existing is None:
+            candidate.skill_links.append(
+                CandidateSkill(
+                    candidate_id=candidate.id,
+                    skill_id=skill_id,
+                    level=item.get("level"),
+                    years_experience=item.get("years_experience"),
+                )
+            )
+            continue
+
+        if item.get("level") is not None:
+            existing.level = item["level"]
+        if item.get("years_experience") is not None:
+            existing.years_experience = item["years_experience"]
+
+
 async def delete_candidate(db: AsyncSession, candidate_id: uuid.UUID) -> None:
     candidate = await get_candidate_by_id(db, candidate_id)
     await db.delete(candidate)

@@ -32,3 +32,8 @@ class CandidateUpdate(BaseModel):
     email: EmailStr | None = None
     resume_path: str | None = Field(default=None, max_length=1024)
     skills: list[CandidateSkillInput] | None = None
+
+
+class ResumeSkillExtractionRead(BaseModel):
+    extracted_count: int
+    candidate: CandidateRead

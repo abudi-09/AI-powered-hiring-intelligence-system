@@ -21,11 +21,19 @@ from app.models.job import Job
 from app.models.job_skill import JobSkill
 from app.models.match import MatchScore
 from app.models.recommendation import Recommendation
+from app.services.intelligence_metrics import (
+    candidate_market_competitiveness,
+    candidate_versatility_index,
+    growth_potential_score,
+    hiring_difficulty_score,
+    level_to_score,
+    skill_scarcity_index,
+)
 
 
 class IntelligenceEngine:
     """Analytics engine for hiring intelligence metrics.
-    
+
     All methods are deterministic and produce the same output for the same input.
     """
 
@@ -86,22 +94,12 @@ class IntelligenceEngine:
             candidate_availability_ratio = 0.0
 
         # Calculate hiring difficulty score (inverse of match quality)
-        # Higher difficulty if: low avg match score, few candidates, many required skills
-        difficulty_base = 100 - avg_match_score  # Base difficulty from match scores
-
-        # Adjust for candidate scarcity
-        if candidates_with_matches < 5:
-            difficulty_base += 20  # High difficulty if very few candidates
-        elif candidates_with_matches < 10:
-            difficulty_base += 10  # Medium difficulty if few candidates
-
-        # Adjust for skill complexity
-        if required_skills_count > 10:
-            difficulty_base += 15  # High difficulty if many skills required
-        elif required_skills_count > 5:
-            difficulty_base += 7  # Medium difficulty if several skills required
-
-        hiring_difficulty_score = min(round(difficulty_base, 2), 100.0)
+        difficulty_base = hiring_difficulty_score(
+            avg_match_score=avg_match_score,
+            candidates_with_matches=candidates_with_matches,
+            required_skills_count=required_skills_count,
+        )
+        hiring_difficulty_score_value = difficulty_base
 
         # Calculate skill scarcity index
         skill_scarcity_scores = []
@@ -112,29 +110,20 @@ class IntelligenceEngine:
         skill_ids = [row[0] for row in job_skills_data_result.all()]
 
         for skill_id in skill_ids:
-            # Count jobs requiring this skill
             demand_result = await db.execute(
                 select(func.count(JobSkill.job_id))
                 .where(JobSkill.skill_id == skill_id)
             )
             demand = demand_result.scalar() or 0
 
-            # Count candidates with this skill
             supply_result = await db.execute(
                 select(func.count(CandidateSkill.candidate_id))
                 .where(CandidateSkill.skill_id == skill_id)
             )
             supply = supply_result.scalar() or 0
+            skill_scarcity_scores.append(skill_scarcity_index(demand=demand, supply=supply))
 
-            # Calculate scarcity (high demand, low supply = high scarcity)
-            if supply > 0:
-                scarcity = min((demand / supply) * 10, 100)  # Normalize to 0-100
-            else:
-                scarcity = 100  # Maximum scarcity if no supply
-
-            skill_scarcity_scores.append(scarcity)
-
-        skill_scarcity_index = round(
+        skill_scarcity_index_value = round(
             sum(skill_scarcity_scores) / len(skill_scarcity_scores), 2
         ) if skill_scarcity_scores else 0.0
 
@@ -155,9 +144,9 @@ class IntelligenceEngine:
         }
 
         return {
-            "hiring_difficulty_score": hiring_difficulty_score,
+            "hiring_difficulty_score": hiring_difficulty_score_value,
             "candidate_availability_ratio": candidate_availability_ratio,
-            "skill_scarcity_index": skill_scarcity_index,
+            "skill_scarcity_index": skill_scarcity_index_value,
             "avg_match_score": avg_match_score,
             "breakdown": breakdown,
         }
@@ -191,11 +180,16 @@ class IntelligenceEngine:
 
         # Get candidate skills
         skills_result = await db.execute(
-            select(CandidateSkill.skill_id, CandidateSkill.proficiency_level)
-            .where(CandidateSkill.candidate_id == candidate_id)
+            select(
+                CandidateSkill.level,
+                CandidateSkill.years_experience,
+            ).where(CandidateSkill.candidate_id == candidate_id)
         )
         skills_data = skills_result.all()
         skill_count = len(skills_data)
+        skill_levels = [row[0] for row in skills_data]
+        years_values = [row[1] or 0.0 for row in skills_data]
+        max_years_experience = max(years_values) if years_values else 0.0
 
         # Get match scores for this candidate
         match_scores_result = await db.execute(
@@ -205,53 +199,31 @@ class IntelligenceEngine:
         )
         match_scores = [row[0] for row in match_scores_result.all()]
 
-        # Calculate market competitiveness (based on match scores)
-        avg_match_score = sum(match_scores) / len(match_scores) if match_scores else 0.0
-        top_matches = [s for s in match_scores if s >= 80]
-        
-        market_competitiveness_score = avg_match_score
-        if len(top_matches) >= 5:
-            market_competitiveness_score = min(market_competitiveness_score + 10, 100)
-        
-        market_competitiveness_score = round(market_competitiveness_score, 2)
+        market_competitiveness_score, top_match_count = candidate_market_competitiveness(match_scores)
+        versatility_index, skill_depth_score, high_proficiency_count = candidate_versatility_index(
+            skill_levels
+        )
+        growth_potential_score_value = growth_potential_score(
+            versatility_index=versatility_index,
+            skill_depth_score=skill_depth_score,
+            max_years_experience=max_years_experience,
+        )
 
-        # Calculate versatility index (skill count and diversity)
-        # More skills = higher versatility, capped at 100
-        versatility_base = min(skill_count * 5, 80)  # Max 80 from count
-        
-        # Bonus for high proficiency skills
-        high_proficiency_skills = [s for s in skills_data if s[1] >= 80]
-        if len(high_proficiency_skills) >= 3:
-            versatility_base += 20
-        elif len(high_proficiency_skills) >= 1:
-            versatility_base += 10
-        
-        versatility_index = min(round(versatility_base, 2), 100.0)
+        avg_proficiency = (
+            sum(level_to_score(level) for level in skill_levels) / len(skill_levels)
+            if skill_levels
+            else 0.0
+        )
 
-        # Calculate skill depth score (average proficiency)
-        avg_proficiency = sum([s[1] for s in skills_data]) / len(skills_data) if skills_data else 0.0
-        skill_depth_score = round(avg_proficiency, 2)
-
-        # Calculate growth potential (combination of versatility and depth)
-        # High versatility + high depth = high growth potential
-        growth_potential_base = (versatility_index * 0.5 + skill_depth_score * 0.5)
-        
-        # Bonus for young candidates with high skills
-        if candidate.years_experience < 5 and skill_depth_score >= 70:
-            growth_potential_base = min(growth_potential_base + 15, 100)
-        
-        growth_potential_score = round(growth_potential_base, 2)
-
-        # Build breakdown
         breakdown = {
             "skill_count": skill_count,
             "match_count": len(match_scores),
-            "top_match_count": len(top_matches),
+            "top_match_count": top_match_count,
             "avg_proficiency": round(avg_proficiency, 2),
-            "high_proficiency_skills": len(high_proficiency_skills),
-            "years_experience": candidate.years_experience,
+            "high_proficiency_skills": high_proficiency_count,
+            "max_years_experience": max_years_experience,
             "strength_indicators": {
-                "high_match_quality": avg_match_score >= 75,
+                "high_match_quality": (sum(match_scores) / len(match_scores)) >= 75 if match_scores else False,
                 "skill_diversity": skill_count >= 5,
                 "deep_expertise": skill_depth_score >= 80,
             },
@@ -261,7 +233,7 @@ class IntelligenceEngine:
             "market_competitiveness_score": market_competitiveness_score,
             "versatility_index": versatility_index,
             "skill_depth_score": skill_depth_score,
-            "growth_potential_score": growth_potential_score,
+            "growth_potential_score": growth_potential_score_value,
             "breakdown": breakdown,
         }
 
@@ -304,40 +276,41 @@ class IntelligenceEngine:
         else:
             scarcity_ratio = float(demand_count) if demand_count > 0 else 0.0
 
-        # Get required levels for this skill in jobs
-        job_levels_result = await db.execute(
-            select(JobSkill.required_level)
+        # Use job skill weights as required priority; candidate levels for supply quality
+        job_weights_result = await db.execute(
+            select(JobSkill.weight)
             .where(JobSkill.skill_id == skill_id)
         )
-        job_levels = [row[0] for row in job_levels_result.all()]
-
-        # Calculate average required level
+        job_weights = [row[0] or 1.0 for row in job_weights_result.all()]
         avg_required_level = round(
-            sum(job_levels) / len(job_levels), 2
-        ) if job_levels else 0.0
+            sum(job_weights) / len(job_weights), 2
+        ) if job_weights else 0.0
 
-        # Get candidate proficiency levels
         candidate_levels_result = await db.execute(
-            select(CandidateSkill.proficiency_level)
+            select(CandidateSkill.level, CandidateSkill.years_experience)
             .where(CandidateSkill.skill_id == skill_id)
         )
-        candidate_levels = [row[0] for row in candidate_levels_result.all()]
+        candidate_rows = candidate_levels_result.all()
+        candidate_level_scores = [level_to_score(row[0]) for row in candidate_rows]
 
         avg_candidate_level = round(
-            sum(candidate_levels) / len(candidate_levels), 2
-        ) if candidate_levels else 0.0
+            sum(candidate_level_scores) / len(candidate_level_scores), 2
+        ) if candidate_level_scores else 0.0
 
-        # Build breakdown
         breakdown = {
             "avg_required_level": avg_required_level,
             "avg_candidate_level": avg_candidate_level,
-            "level_gap": round(avg_required_level - avg_candidate_level, 2) if candidate_levels else avg_required_level,
-            "high_demand_jobs": len([l for l in job_levels if l >= 80]),
-            "expert_candidates": len([l for l in candidate_levels if l >= 80]),
+            "level_gap": round(avg_required_level - avg_candidate_level, 2)
+            if candidate_level_scores
+            else avg_required_level,
+            "high_demand_jobs": len([weight for weight in job_weights if weight >= 0.8]),
+            "expert_candidates": len([score for score in candidate_level_scores if score >= 80.0]),
             "market_indicators": {
                 "high_demand": demand_count >= 10,
                 "low_supply": supply_count < 5,
-                "skill_gap": avg_required_level > avg_candidate_level + 10 if candidate_levels else True,
+                "skill_gap": avg_required_level > avg_candidate_level + 10
+                if candidate_level_scores
+                else True,
             },
         }
 
