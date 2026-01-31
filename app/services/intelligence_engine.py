@@ -75,9 +75,9 @@ class IntelligenceEngine:
 
         # Get match scores for this job
         match_scores_result = await db.execute(
-            select(MatchScore.overall_score)
+            select(MatchScore.score)
             .where(MatchScore.job_id == job_id)
-            .order_by(MatchScore.overall_score.desc())
+            .order_by(MatchScore.score.desc())
         )
         match_scores = [row[0] for row in match_scores_result.all()]
 
@@ -193,9 +193,9 @@ class IntelligenceEngine:
 
         # Get match scores for this candidate
         match_scores_result = await db.execute(
-            select(MatchScore.overall_score)
+            select(MatchScore.score)
             .where(MatchScore.candidate_id == candidate_id)
-            .order_by(MatchScore.overall_score.desc())
+            .order_by(MatchScore.score.desc())
         )
         match_scores = [row[0] for row in match_scores_result.all()]
 
@@ -341,8 +341,8 @@ class IntelligenceEngine:
         """
         # Get all match scores
         match_scores_result = await db.execute(
-            select(MatchScore.overall_score)
-            .order_by(MatchScore.overall_score.desc())
+            select(MatchScore.score)
+            .order_by(MatchScore.score.desc())
         )
         all_scores = [row[0] for row in match_scores_result.all()]
 
@@ -489,7 +489,7 @@ class IntelligenceEngine:
         for job_id in job_ids:
             # Get job difficulty from match scores
             match_result = await db.execute(
-                select(func.avg(MatchScore.overall_score))
+                select(func.avg(MatchScore.score))
                 .where(MatchScore.job_id == job_id)
             )
             avg_match = match_result.scalar() or 50
