@@ -13,7 +13,9 @@ from app.models.job_skill import JobSkill
 from app.models.skill import Skill
 from app.models.user import User, UserRole
 from app.schemas.job import JobCreate, JobRead, JobUpdate, JobSkillRead
+from app.schemas.match import JobBatchAutoScoreRequest, JobBatchAutoScoreResponse
 from app.crud.job import create_job as crud_create_job, delete_job as crud_delete_job, list_jobs as crud_list_jobs, update_job as crud_update_job, get_job_by_id as crud_get_job_by_id
+from app.crud.match import batch_auto_score_job_matches
 
 
 router = APIRouter(prefix="/jobs", tags=["jobs"])
@@ -98,3 +100,24 @@ async def delete_job(
 ) -> None:
     await crud_delete_job(db, job_id)
     return None
+
+
+@router.post(
+    "/{job_id}/matches/auto-score",
+    response_model=JobBatchAutoScoreResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+async def auto_score_job_matches(
+    job_id: uuid.UUID,
+    payload: JobBatchAutoScoreRequest | None = None,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(AllowedRoleDep),
+) -> JobBatchAutoScoreResponse:
+    """Calculate and store match scores for all candidates against a job."""
+    candidate_ids = payload.candidate_ids if payload is not None else None
+    matches = await batch_auto_score_job_matches(db, job_id, candidate_ids)
+    return JobBatchAutoScoreResponse(
+        job_id=job_id,
+        scored_count=len(matches),
+        matches=matches,
+    )

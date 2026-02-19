@@ -29,6 +29,16 @@ class MatchScoreAutoRequest(BaseModel):
     job_id: uuid.UUID
 
 
+class JobBatchAutoScoreRequest(BaseModel):
+    candidate_ids: list[uuid.UUID] | None = None
+
+
+class JobBatchAutoScoreResponse(BaseModel):
+    job_id: uuid.UUID
+    scored_count: int
+    matches: list[MatchScoreRead]
+
+
 class MatchScoreList(BaseModel):
     matches: list[MatchScoreRead]
     total: int

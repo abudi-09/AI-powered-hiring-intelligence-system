@@ -32,10 +32,14 @@ async def upsert_match_score(
     job_id: uuid.UUID,
     score: float,
     explanation: dict | None,
+    *,
+    commit: bool = True,
+    validate: bool = True,
 ) -> MatchScore:
     """Insert or update match score."""
-    await _validate_candidate_exists(db, candidate_id)
-    await _validate_job_exists(db, job_id)
+    if validate:
+        await _validate_candidate_exists(db, candidate_id)
+        await _validate_job_exists(db, job_id)
     
     stmt = (
         insert(MatchScore)
@@ -56,7 +60,8 @@ async def upsert_match_score(
     )
     
     result = await db.execute(stmt)
-    await db.commit()
+    if commit:
+        await db.commit()
     row = result.fetchone()
     
     if row is None:
@@ -66,6 +71,44 @@ async def upsert_match_score(
         )
     
     return row[0]
+
+
+async def batch_auto_score_job_matches(
+    db: AsyncSession,
+    job_id: uuid.UUID,
+    candidate_ids: list[uuid.UUID] | None = None,
+) -> list[MatchScore]:
+    """Score all candidates (or a subset) against a job and persist match rows."""
+    await _validate_job_exists(db, job_id)
+
+    if candidate_ids is None:
+        result = await db.execute(select(Candidate.id))
+        candidate_ids = [row[0] for row in result.all()]
+    else:
+        await _validate_candidates_exist(db, candidate_ids)
+
+    if not candidate_ids:
+        return []
+
+    engine = MatchEngine(db)
+    matches: list[MatchScore] = []
+
+    for candidate_id in candidate_ids:
+        score, explanation = await engine.calculate_match_score(candidate_id, job_id)
+        match = await upsert_match_score(
+            db,
+            candidate_id,
+            job_id,
+            score,
+            explanation,
+            commit=False,
+            validate=False,
+        )
+        matches.append(match)
+
+    await db.commit()
+    matches.sort(key=lambda item: item.score, reverse=True)
+    return matches
 
 
 async def get_matches_by_job(db: AsyncSession, job_id: uuid.UUID) -> list[MatchScore]:
@@ -133,4 +176,18 @@ async def _validate_job_exists(db: AsyncSession, job_id: uuid.UUID) -> None:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Job not found",
+        )
+
+
+async def _validate_candidates_exist(
+    db: AsyncSession, candidate_ids: list[uuid.UUID]
+) -> None:
+    """Validate every requested candidate exists."""
+    unique_ids = list(dict.fromkeys(candidate_ids))
+    result = await db.execute(select(Candidate.id).where(Candidate.id.in_(unique_ids)))
+    existing = set(result.scalars().all())
+    if len(existing) != len(unique_ids):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="One or more candidates not found",
         )
