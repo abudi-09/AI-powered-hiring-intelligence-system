@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import role_required
-from app.crud.skill import create_skill, delete_skill, get_skill_by_id, list_skills, update_skill
+from app.crud.skill import create_skill as crud_create_skill, delete_skill, get_skill_by_id, list_skills, update_skill
 from app.db.session import get_db
 from app.models.user import User, UserRole
 from app.schemas.skill import SkillCreate, SkillRead, SkillUpdate
@@ -26,12 +26,12 @@ async def skills_get(skill_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
 
 
 @router.post("/", response_model=SkillRead, status_code=status.HTTP_201_CREATED)
-async def create_skill(
+async def skills_create(
     payload: SkillCreate,
     db: AsyncSession = Depends(get_db),
     _: User = Depends(role_required(UserRole.Admin)),
 ):
-    return await create_skill(db, payload)
+    return await crud_create_skill(db, payload)
 
 
 @router.put("/{skill_id}", response_model=SkillRead)

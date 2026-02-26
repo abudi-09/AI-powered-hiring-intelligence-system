@@ -113,6 +113,7 @@ async def batch_auto_score_job_matches(
 
 async def get_matches_by_job(db: AsyncSession, job_id: uuid.UUID) -> list[MatchScore]:
     """Get all matches for a job, ordered by score descending."""
+    await _validate_job_exists(db, job_id)
     result = await db.execute(
         select(MatchScore)
         .where(MatchScore.job_id == job_id)
@@ -137,6 +138,7 @@ async def get_top_candidates(
     db: AsyncSession, job_id: uuid.UUID, limit: int = 10
 ) -> list[MatchScore]:
     """Get top N candidates for a job by score."""
+    await _validate_job_exists(db, job_id)
     result = await db.execute(
         select(MatchScore)
         .where(MatchScore.job_id == job_id)

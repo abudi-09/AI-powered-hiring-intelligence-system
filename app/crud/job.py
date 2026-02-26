@@ -17,6 +17,11 @@ async def _validate_skills_exist(db: AsyncSession, skill_ids: Iterable[uuid.UUID
     ids = list(skill_ids)
     if not ids:
         return
+    if len(set(ids)) != len(ids):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Duplicate skill IDs in request",
+        )
     result = await db.execute(select(Skill.id).where(Skill.id.in_(ids)))
     existing = set(result.scalars().all())
     if len(existing) != len(set(ids)):
@@ -56,13 +61,14 @@ async def list_jobs(db: AsyncSession) -> list[Job]:
 
 
 async def create_job(db: AsyncSession, payload: JobCreate, owner_id: uuid.UUID) -> Job:
-    job = Job(title=payload.title, description=payload.description, owner_id=owner_id)
-    db.add(job)
-    await db.flush()
-
     skills_payload = []
     if payload.skills:
         skills_payload = [{"skill_id": s.skill_id, "weight": s.weight} for s in payload.skills]
+        await _validate_skills_exist(db, [item["skill_id"] for item in skills_payload])
+
+    job = Job(title=payload.title, description=payload.description, owner_id=owner_id)
+    db.add(job)
+    await db.flush()
 
     await _replace_job_skills(db, job, skills_payload)
 

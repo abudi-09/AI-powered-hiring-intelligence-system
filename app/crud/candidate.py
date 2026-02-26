@@ -17,6 +17,11 @@ async def _validate_skills_exist(db: AsyncSession, skill_ids: Iterable[uuid.UUID
     ids = list(skill_ids)
     if not ids:
         return
+    if len(set(ids)) != len(ids):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Duplicate skill IDs in request",
+        )
     result = await db.execute(select(Skill.id).where(Skill.id.in_(ids)))
     existing = set(result.scalars().all())
     if len(existing) != len(set(ids)):
@@ -56,14 +61,6 @@ async def list_candidates(db: AsyncSession) -> list[Candidate]:
 
 
 async def create_candidate(db: AsyncSession, payload: CandidateCreate) -> Candidate:
-    candidate = Candidate(
-        full_name=payload.full_name,
-        email=str(payload.email) if payload.email is not None else None,
-        resume_path=payload.resume_path,
-    )
-    db.add(candidate)
-    await db.flush()
-
     skills_payload = []
     if payload.skills:
         skills_payload = [
@@ -74,6 +71,15 @@ async def create_candidate(db: AsyncSession, payload: CandidateCreate) -> Candid
             }
             for s in payload.skills
         ]
+        await _validate_skills_exist(db, [item["skill_id"] for item in skills_payload])
+
+    candidate = Candidate(
+        full_name=payload.full_name,
+        email=str(payload.email) if payload.email is not None else None,
+        resume_path=payload.resume_path,
+    )
+    db.add(candidate)
+    await db.flush()
 
     await _replace_candidate_skills(db, candidate, skills_payload)
 
