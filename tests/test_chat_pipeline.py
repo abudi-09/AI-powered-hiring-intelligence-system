@@ -323,7 +323,7 @@ async def test_list_chat_sessions_for_current_user(
     with patch(
         "app.api.chat.conversation_crud.list_user_sessions",
         new_callable=AsyncMock,
-        return_value=[session],
+        return_value=[(session, 2)],
     ):
         response = await client.get(
             "/chat/sessions",

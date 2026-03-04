@@ -38,15 +38,23 @@ async def get_session(
 
 async def list_user_sessions(
     db: AsyncSession, user_id: uuid.UUID, limit: int = 50
-) -> Sequence[ConversationSession]:
-    """List all sessions for a user."""
+) -> Sequence[tuple[ConversationSession, int]]:
+    """List all sessions for a user with message counts."""
     result = await db.execute(
-        select(ConversationSession)
+        select(
+            ConversationSession,
+            func.count(ConversationMessage.id).label("message_count"),
+        )
+        .outerjoin(
+            ConversationMessage,
+            ConversationMessage.session_id == ConversationSession.id,
+        )
         .where(ConversationSession.user_id == user_id)
+        .group_by(ConversationSession.id)
         .order_by(ConversationSession.updated_at.desc())
         .limit(limit)
     )
-    return result.scalars().all()
+    return [(session, int(message_count)) for session, message_count in result.all()]
 
 
 async def update_session_context(

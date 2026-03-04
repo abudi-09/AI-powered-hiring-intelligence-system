@@ -107,15 +107,15 @@ async def list_sessions(
     sessions = await conversation_crud.list_user_sessions(db, current_user.id)
     return [
         ConversationSessionRead(
-            id=s.id,
-            user_id=s.user_id,
-            title=s.title,
-            context=s.context,
-            created_at=s.created_at,
-            updated_at=s.updated_at,
-            message_count=len(s.messages) if hasattr(s, "messages") else 0,
+            id=session.id,
+            user_id=session.user_id,
+            title=session.title,
+            context=session.context,
+            created_at=session.created_at,
+            updated_at=session.updated_at,
+            message_count=message_count,
         )
-        for s in sessions
+        for session, message_count in sessions
     ]
 
 
