@@ -61,6 +61,13 @@ async def auto_generate_insights_for_job(
     db: AsyncSession, job_id: uuid.UUID
 ) -> Sequence[Insight]:
     """Auto-generate and persist insights for a job."""
+    await db.execute(
+        delete(Insight).where(
+            Insight.entity_type == "job", Insight.entity_id == job_id
+        )
+    )
+    await db.commit()
+
     engine = InsightEngine(db)
     insight_data_list = await engine.generate_job_insights(job_id)
 
@@ -86,6 +93,14 @@ async def auto_generate_insights_for_candidate(
     db: AsyncSession, candidate_id: uuid.UUID
 ) -> Sequence[Insight]:
     """Auto-generate and persist insights for a candidate."""
+    await db.execute(
+        delete(Insight).where(
+            Insight.entity_type == "candidate",
+            Insight.entity_id == candidate_id,
+        )
+    )
+    await db.commit()
+
     engine = InsightEngine(db)
     insight_data_list = await engine.generate_candidate_insights(candidate_id)
 
