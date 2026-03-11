@@ -117,7 +117,7 @@ async def test_auto_score_job_matches_propagates_job_not_found(
     with patch(
         "app.api.jobs.batch_auto_score_job_matches",
         new_callable=AsyncMock,
-        side_effect=HTTPException(status_code=400, detail="Job not found"),
+        side_effect=HTTPException(status_code=404, detail="Job not found"),
     ):
         transport = ASGITransport(app=app)
         async with AsyncClient(transport=transport, base_url="http://testserver") as client:
@@ -128,5 +128,5 @@ async def test_auto_score_job_matches_propagates_job_not_found(
 
     app.dependency_overrides.clear()
 
-    assert response.status_code == 400
+    assert response.status_code == 404
     assert response.json()["detail"] == "Job not found"

@@ -10,7 +10,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.candidate import Candidate
 from app.models.job import Job
 from app.models.match import MatchScore
-from app.schemas.match import MatchScoreCreate
 from app.services.match_engine import MatchEngine
 
 
@@ -126,6 +125,7 @@ async def get_matches_by_candidate(
     db: AsyncSession, candidate_id: uuid.UUID
 ) -> list[MatchScore]:
     """Get all matches for a candidate, ordered by score descending."""
+    await _validate_candidate_exists(db, candidate_id)
     result = await db.execute(
         select(MatchScore)
         .where(MatchScore.candidate_id == candidate_id)
@@ -152,6 +152,7 @@ async def get_top_jobs(
     db: AsyncSession, candidate_id: uuid.UUID, limit: int = 10
 ) -> list[MatchScore]:
     """Get top N jobs for a candidate by score."""
+    await _validate_candidate_exists(db, candidate_id)
     result = await db.execute(
         select(MatchScore)
         .where(MatchScore.candidate_id == candidate_id)
@@ -166,7 +167,7 @@ async def _validate_candidate_exists(db: AsyncSession, candidate_id: uuid.UUID) 
     result = await db.execute(select(Candidate.id).where(Candidate.id == candidate_id))
     if result.scalar_one_or_none() is None:
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
+            status_code=status.HTTP_404_NOT_FOUND,
             detail="Candidate not found",
         )
 
@@ -176,7 +177,7 @@ async def _validate_job_exists(db: AsyncSession, job_id: uuid.UUID) -> None:
     result = await db.execute(select(Job.id).where(Job.id == job_id))
     if result.scalar_one_or_none() is None:
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
+            status_code=status.HTTP_404_NOT_FOUND,
             detail="Job not found",
         )
 
@@ -190,6 +191,6 @@ async def _validate_candidates_exist(
     existing = set(result.scalars().all())
     if len(existing) != len(unique_ids):
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
+            status_code=status.HTTP_404_NOT_FOUND,
             detail="One or more candidates not found",
         )

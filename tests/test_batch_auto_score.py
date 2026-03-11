@@ -136,7 +136,7 @@ async def test_batch_auto_score_rejects_missing_job() -> None:
     with pytest.raises(HTTPException) as exc:
         await batch_auto_score_job_matches(mock_db, job_id)
 
-    assert exc.value.status_code == 400
+    assert exc.value.status_code == 404
     assert exc.value.detail == "Job not found"
 
 
@@ -161,5 +161,5 @@ async def test_batch_auto_score_rejects_missing_candidate_filter() -> None:
             candidate_ids=[candidate_id],
         )
 
-    assert exc.value.status_code == 400
+    assert exc.value.status_code == 404
     assert exc.value.detail == "One or more candidates not found"

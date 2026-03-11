@@ -6,7 +6,7 @@ from fastapi import HTTPException
 
 from app.crud.candidate import create_candidate
 from app.crud.job import create_job
-from app.crud.match import get_matches_by_job
+from app.crud.match import get_matches_by_candidate, get_matches_by_job, get_top_jobs
 from app.schemas.candidate import CandidateCreate
 from app.schemas.candidate_skill import CandidateSkillInput
 from app.schemas.job import JobCreate, JobSkillInput
@@ -81,5 +81,35 @@ async def test_get_matches_by_job_rejects_unknown_job() -> None:
     with pytest.raises(HTTPException) as exc:
         await get_matches_by_job(mock_db, job_id)
 
-    assert exc.value.status_code == 400
+    assert exc.value.status_code == 404
     assert exc.value.detail == "Job not found"
+
+
+@pytest.mark.asyncio
+async def test_get_matches_by_candidate_rejects_unknown_candidate() -> None:
+    candidate_id = uuid.uuid4()
+    mock_db = AsyncMock()
+    candidate_lookup = MagicMock()
+    candidate_lookup.scalar_one_or_none.return_value = None
+    mock_db.execute = AsyncMock(return_value=candidate_lookup)
+
+    with pytest.raises(HTTPException) as exc:
+        await get_matches_by_candidate(mock_db, candidate_id)
+
+    assert exc.value.status_code == 404
+    assert exc.value.detail == "Candidate not found"
+
+
+@pytest.mark.asyncio
+async def test_get_top_jobs_rejects_unknown_candidate() -> None:
+    candidate_id = uuid.uuid4()
+    mock_db = AsyncMock()
+    candidate_lookup = MagicMock()
+    candidate_lookup.scalar_one_or_none.return_value = None
+    mock_db.execute = AsyncMock(return_value=candidate_lookup)
+
+    with pytest.raises(HTTPException) as exc:
+        await get_top_jobs(mock_db, candidate_id)
+
+    assert exc.value.status_code == 404
+    assert exc.value.detail == "Candidate not found"
