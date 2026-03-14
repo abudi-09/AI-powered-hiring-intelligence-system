@@ -94,7 +94,11 @@ async def test_extract_skills_from_resume_merges_catalog_skills(
             new_callable=AsyncMock,
         ) as merge_skills:
             with patch.object(Path, "is_file", return_value=True):
-                with patch.object(Path, "read_text", return_value=resume_text):
+                with patch(
+                    "app.api.candidates._read_resume_text",
+                    new_callable=AsyncMock,
+                    return_value=resume_text,
+                ):
                     transport = ASGITransport(app=app)
                     async with AsyncClient(transport=transport, base_url="http://testserver") as client:
                         response = await client.post(

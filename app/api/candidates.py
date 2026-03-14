@@ -170,6 +170,13 @@ async def upload_candidate_resume(
     return await _candidate_to_read(db, candidate)
 
 
+async def _read_resume_text(resume_path: Path) -> str:
+    def _read_sync() -> str:
+        return resume_path.read_text(encoding="utf-8")
+
+    return await anyio.to_thread.run_sync(_read_sync)
+
+
 @router.post("/{candidate_id}/skills/extract-from-resume", response_model=ResumeSkillExtractionRead)
 async def extract_skills_from_resume(
     candidate_id: uuid.UUID,
@@ -191,7 +198,7 @@ async def extract_skills_from_resume(
         )
 
     try:
-        resume_text = resume_path.read_text(encoding="utf-8")
+        resume_text = await _read_resume_text(resume_path)
     except UnicodeDecodeError as exc:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
