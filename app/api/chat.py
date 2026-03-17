@@ -6,7 +6,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.deps import get_async_db, get_current_user, role_required
+from app.api.deps import get_async_db, role_required
 from app.crud import conversation as conversation_crud
 from app.models.user import User, UserRole
 from app.schemas.conversation import (
@@ -101,7 +101,7 @@ async def process_chat_query(
 @router.get("/sessions", response_model=list[ConversationSessionRead])
 async def list_sessions(
     db: Annotated[AsyncSession, Depends(get_async_db)],
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(AllowedRoleDep),
 ):
     """List all conversation sessions for current user."""
     sessions = await conversation_crud.list_user_sessions(db, current_user.id)
@@ -123,7 +123,7 @@ async def list_sessions(
 async def get_session_detail(
     session_id: uuid.UUID,
     db: Annotated[AsyncSession, Depends(get_async_db)],
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(AllowedRoleDep),
 ):
     """Get detailed conversation session with all messages."""
     session = await conversation_crud.get_session(db, session_id, current_user.id)
@@ -137,7 +137,7 @@ async def get_session_detail(
 async def delete_session(
     session_id: uuid.UUID,
     db: Annotated[AsyncSession, Depends(get_async_db)],
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(AllowedRoleDep),
 ):
     """Delete a conversation session."""
     deleted = await conversation_crud.delete_session(db, session_id, current_user.id)

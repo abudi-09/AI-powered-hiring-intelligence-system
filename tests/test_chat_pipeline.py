@@ -408,3 +408,52 @@ async def test_delete_chat_session(
 
     assert response.status_code == 200
     assert response.json()["message"] == "Session deleted successfully"
+
+
+@pytest.mark.asyncio
+async def test_chat_session_routes_reject_candidate_role(session_id: uuid.UUID) -> None:
+    now = datetime.now(timezone.utc)
+    candidate_user = User(
+        id=uuid.UUID("00000000-0000-4000-8000-000000000099"),
+        email="candidate@example.com",
+        hashed_password=get_password_hash("Password123"),
+        full_name="Candidate User",
+        role=UserRole.Candidate,
+        is_active=True,
+        created_at=now,
+        updated_at=now,
+    )
+
+    mock_session = AsyncMock()
+    user_result = MagicMock()
+    user_result.scalar_one_or_none.return_value = candidate_user
+    mock_session.execute = AsyncMock(return_value=user_result)
+
+    app = create_app()
+
+    async def override_get_db():
+        yield mock_session
+
+    app.dependency_overrides[get_db] = override_get_db
+    token = create_access_token(subject=str(candidate_user.id), role=candidate_user.role.value)
+
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://testserver") as client:
+        list_response = await client.get(
+            "/chat/sessions",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        detail_response = await client.get(
+            f"/chat/session/{session_id}",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        delete_response = await client.delete(
+            f"/chat/session/{session_id}",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+
+    app.dependency_overrides.clear()
+
+    assert list_response.status_code == 403
+    assert detail_response.status_code == 403
+    assert delete_response.status_code == 403
