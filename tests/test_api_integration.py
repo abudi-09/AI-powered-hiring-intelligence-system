@@ -154,7 +154,7 @@ async def test_users_me_returns_current_user_with_valid_token(
 
 
 @pytest.mark.asyncio
-async def test_skills_list_returns_catalog(api_client: AsyncClient) -> None:
+async def test_skills_list_returns_catalog(api_client: AsyncClient, active_user: User) -> None:
     skill = Skill(
         id=uuid.UUID("00000000-0000-4000-8000-000000000010"),
         name="Python",
@@ -163,11 +163,13 @@ async def test_skills_list_returns_catalog(api_client: AsyncClient) -> None:
         created_at=datetime.now(timezone.utc),
         updated_at=datetime.now(timezone.utc),
     )
+    user_result = MagicMock()
+    user_result.scalar_one_or_none.return_value = active_user
     skills_result = MagicMock()
     skills_result.scalars.return_value.all.return_value = [skill]
 
     mock_session = AsyncMock()
-    mock_session.execute = AsyncMock(return_value=skills_result)
+    mock_session.execute = AsyncMock(side_effect=[user_result, skills_result])
 
     app = create_app()
 
@@ -175,9 +177,13 @@ async def test_skills_list_returns_catalog(api_client: AsyncClient) -> None:
         yield mock_session
 
     app.dependency_overrides[get_db] = override_get_db
+    token = create_access_token(subject=str(active_user.id), role=active_user.role.value)
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://testserver") as client:
-        response = await client.get("/skills/")
+        response = await client.get(
+            "/skills/",
+            headers={"Authorization": f"Bearer {token}"},
+        )
 
     app.dependency_overrides.clear()
 

@@ -14,14 +14,23 @@ from app.schemas.skill import SkillCreate, SkillRead, SkillUpdate
 
 router = APIRouter(prefix="/skills", tags=["skills"])
 
+ReadRoleDep = role_required(UserRole.Admin, UserRole.Recruiter, UserRole.HiringManager)
+
 
 @router.get("/", response_model=list[SkillRead])
-async def skills_list(db: AsyncSession = Depends(get_db)):
+async def skills_list(
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(ReadRoleDep),
+):
     return await list_skills(db)
 
 
 @router.get("/{skill_id}", response_model=SkillRead)
-async def skills_get(skill_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
+async def skills_get(
+    skill_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(ReadRoleDep),
+):
     return await get_skill_by_id(db, skill_id)
 
 
