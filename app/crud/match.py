@@ -19,7 +19,7 @@ async def calculate_match_score(
     """Calculate match score using AI engine."""
     await _validate_candidate_exists(db, candidate_id)
     await _validate_job_exists(db, job_id)
-    
+
     engine = MatchEngine(db)
     score, explanation = await engine.calculate_match_score(candidate_id, job_id)
     return score, explanation
@@ -39,7 +39,7 @@ async def upsert_match_score(
     if validate:
         await _validate_candidate_exists(db, candidate_id)
         await _validate_job_exists(db, job_id)
-    
+
     stmt = (
         insert(MatchScore)
         .values(
@@ -57,18 +57,18 @@ async def upsert_match_score(
         )
         .returning(MatchScore)
     )
-    
+
     result = await db.execute(stmt)
     if commit:
         await db.commit()
     row = result.fetchone()
-    
+
     if row is None:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to upsert match score",
         )
-    
+
     return row[0]
 
 
