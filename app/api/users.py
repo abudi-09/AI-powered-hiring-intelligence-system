@@ -1,10 +1,18 @@
 from __future__ import annotations
+
 import uuid
-from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import select
+
+from fastapi import APIRouter, Depends, status
 from sqlalchemy.ext.asyncio import AsyncSession
+
 from app.api.deps import get_current_user, role_required
-from app.core.security import get_password_hash
+from app.crud.user import (
+    create_user as crud_create_user,
+    deactivate_user as crud_deactivate_user,
+    get_user_by_id as crud_get_user_by_id,
+    list_users as crud_list_users,
+    update_user as crud_update_user,
+)
 from app.db.session import get_db
 from app.models.user import User, UserRole
 from app.schemas.user import UserCreate, UserRead, UserUpdate
@@ -22,8 +30,8 @@ async def list_users(
     db: AsyncSession = Depends(get_db),
     _: User = Depends(role_required(UserRole.Admin)),
 ) -> list[User]:
-    result = await db.execute(select(User).order_by(User.created_at.desc()))
-    return list(result.scalars().all())
+    return await crud_list_users(db)
+
 
 @router.post("/", response_model=UserRead, status_code=status.HTTP_201_CREATED)
 async def create_user(
@@ -31,21 +39,7 @@ async def create_user(
     db: AsyncSession = Depends(get_db),
     _: User = Depends(role_required(UserRole.Admin)),
 ) -> User:
-    existing = await db.execute(select(User).where(User.email == payload.email))
-    if existing.scalar_one_or_none() is not None:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Email already exists")
-
-    user = User(
-        full_name=payload.full_name,
-        email=str(payload.email),
-        hashed_password=get_password_hash(payload.password),
-        role=payload.role,
-        is_active=True,
-    )
-    db.add(user)
-    await db.commit()
-    await db.refresh(user)
-    return user
+    return await crud_create_user(db, payload)
 
 
 @router.get("/{user_id}", response_model=UserRead)
@@ -54,11 +48,9 @@ async def get_user(
     db: AsyncSession = Depends(get_db),
     _: User = Depends(role_required(UserRole.Admin)),
 ) -> User:
-    result = await db.execute(select(User).where(User.id == user_id))
-    user = result.scalar_one_or_none()
-    if user is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
-    return user
+    return await crud_get_user_by_id(db, user_id)
+
+
 @router.patch("/{user_id}", response_model=UserRead)
 async def update_user(
     user_id: uuid.UUID,
@@ -66,23 +58,7 @@ async def update_user(
     db: AsyncSession = Depends(get_db),
     _: User = Depends(role_required(UserRole.Admin)),
 ) -> User:
-    result = await db.execute(select(User).where(User.id == user_id))
-    user = result.scalar_one_or_none()
-    if user is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
-
-    if payload.full_name is not None:
-        user.full_name = payload.full_name
-    if payload.role is not None:
-        user.role = payload.role
-    if payload.is_active is not None:
-        user.is_active = payload.is_active
-    if payload.password is not None:
-        user.hashed_password = get_password_hash(payload.password)
-
-    await db.commit()
-    await db.refresh(user)
-    return user
+    return await crud_update_user(db, user_id, payload)
 
 
 @router.post("/{user_id}/deactivate", response_model=UserRead)
@@ -91,12 +67,4 @@ async def deactivate_user(
     db: AsyncSession = Depends(get_db),
     _: User = Depends(role_required(UserRole.Admin)),
 ) -> User:
-    result = await db.execute(select(User).where(User.id == user_id))
-    user = result.scalar_one_or_none()
-    if user is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
-
-    user.is_active = False
-    await db.commit()
-    await db.refresh(user)
-    return user
+    return await crud_deactivate_user(db, user_id)
