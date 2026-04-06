@@ -8,6 +8,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.job import Job
+from app.models.job import JobStatus
 from app.models.job_skill import JobSkill
 from app.models.skill import Skill
 from app.schemas.job import JobCreate, JobUpdate
@@ -55,8 +56,11 @@ async def get_job_by_id(db: AsyncSession, job_id: uuid.UUID) -> Job:
     return job
 
 
-async def list_jobs(db: AsyncSession) -> list[Job]:
-    result = await db.execute(select(Job).order_by(Job.created_at.desc()))
+async def list_jobs(db: AsyncSession, status: JobStatus | None = None) -> list[Job]:
+    query = select(Job)
+    if status is not None:
+        query = query.where(Job.status == status.value)
+    result = await db.execute(query.order_by(Job.created_at.desc()))
     return list(result.scalars().all())
 
 
@@ -66,7 +70,12 @@ async def create_job(db: AsyncSession, payload: JobCreate, owner_id: uuid.UUID) 
         skills_payload = [{"skill_id": s.skill_id, "weight": s.weight} for s in payload.skills]
         await _validate_skills_exist(db, [item["skill_id"] for item in skills_payload])
 
-    job = Job(title=payload.title, description=payload.description, owner_id=owner_id)
+    job = Job(
+        title=payload.title,
+        description=payload.description,
+        owner_id=owner_id,
+        status=payload.status.value,
+    )
     db.add(job)
     await db.flush()
 
@@ -84,6 +93,8 @@ async def update_job(db: AsyncSession, job_id: uuid.UUID, payload: JobUpdate) ->
         job.title = payload.title
     if payload.description is not None:
         job.description = payload.description
+    if payload.status is not None:
+        job.status = payload.status.value
 
     if payload.skills is not None:
         skills_payload = [{"skill_id": s.skill_id, "weight": s.weight} for s in payload.skills]

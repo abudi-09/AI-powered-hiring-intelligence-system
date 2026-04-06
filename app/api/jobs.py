@@ -8,7 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user, role_required
 from app.db.session import get_db
-from app.models.job import Job
+from app.models.job import Job, JobStatus
 from app.models.job_skill import JobSkill
 from app.models.skill import Skill
 from app.models.user import User, UserRole
@@ -41,6 +41,7 @@ async def _job_to_read(db: AsyncSession, job: Job) -> JobRead:
         id=job.id,
         title=job.title,
         description=job.description,
+        status=JobStatus(job.status),
         owner_id=job.owner_id,
         skills=skills_out,
         created_at=job.created_at,
@@ -54,9 +55,10 @@ async def _job_to_read(db: AsyncSession, job: Job) -> JobRead:
 @router.get("/", response_model=list[JobRead])
 async def list_jobs(
     db: AsyncSession = Depends(get_db),
+    status: JobStatus | None = None,
     _: User = Depends(AllowedRoleDep),
 ) -> list[JobRead]:
-    jobs = await crud_list_jobs(db)
+    jobs = await crud_list_jobs(db, status=status)
     return [await _job_to_read(db, job) for job in jobs]
 
 

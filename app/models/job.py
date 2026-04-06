@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import enum
 import uuid
 from datetime import datetime
 from typing import TYPE_CHECKING
@@ -19,6 +20,12 @@ if TYPE_CHECKING:
     from app.models.user import User
 
 
+class JobStatus(str, enum.Enum):
+    DRAFT = "draft"
+    OPEN = "open"
+    CLOSED = "closed"
+
+
 class Job(Base):
     __tablename__ = "jobs"
 
@@ -26,6 +33,12 @@ class Job(Base):
 
     title: Mapped[str] = mapped_column(String(255), nullable=False)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    status: Mapped[str] = mapped_column(
+        String(20),
+        nullable=False,
+        server_default=JobStatus.OPEN.value,
+    )
 
     owner_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),

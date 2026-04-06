@@ -5,6 +5,8 @@ from datetime import datetime
 
 from pydantic import BaseModel, Field
 
+from app.models.job import JobStatus
+
 
 class JobSkillInput(BaseModel):
     skill_id: uuid.UUID
@@ -21,6 +23,7 @@ class JobRead(BaseModel):
     id: uuid.UUID
     title: str
     description: str | None
+    status: JobStatus
     owner_id: uuid.UUID
     skills: list[JobSkillRead]
     created_at: datetime
@@ -30,10 +33,12 @@ class JobRead(BaseModel):
 class JobCreate(BaseModel):
     title: str = Field(min_length=1, max_length=255)
     description: str | None = Field(default=None)
+    status: JobStatus = JobStatus.OPEN
     skills: list[JobSkillInput] | None = Field(default_factory=list)
 
 
 class JobUpdate(BaseModel):
     title: str | None = Field(default=None, min_length=1, max_length=255)
     description: str | None = None
+    status: JobStatus | None = None
     skills: list[JobSkillInput] | None = None
