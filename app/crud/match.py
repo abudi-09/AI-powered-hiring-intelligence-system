@@ -3,7 +3,7 @@ from __future__ import annotations
 import uuid
 
 from fastapi import HTTPException, status
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -53,6 +53,7 @@ async def upsert_match_score(
             set_={
                 "score": score,
                 "explanation": explanation,
+                "updated_at": func.now(),
             },
         )
         .returning(MatchScore)

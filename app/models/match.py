@@ -46,6 +46,12 @@ class MatchScore(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now()
     )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=func.now(),
+        onupdate=func.now(),
+    )
 
     candidate: Mapped["Candidate"] = relationship("Candidate", back_populates="match_scores")
     job: Mapped["Job"] = relationship("Job", back_populates="match_scores")

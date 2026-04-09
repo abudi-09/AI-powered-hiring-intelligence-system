@@ -15,6 +15,7 @@ class MatchScoreRead(BaseModel):
     score: float
     explanation: dict | None
     created_at: datetime
+    updated_at: datetime
 
 
 class MatchScoreCreate(BaseModel):

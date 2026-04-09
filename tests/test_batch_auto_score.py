@@ -14,13 +14,15 @@ def _match_row(
     job_id: uuid.UUID,
     score: float,
 ) -> MatchScore:
+    now = datetime.now(timezone.utc)
     return MatchScore(
         id=uuid.uuid4(),
         candidate_id=candidate_id,
         job_id=job_id,
         score=score,
         explanation={"final_score": score},
-        created_at=datetime.now(timezone.utc),
+        created_at=now,
+        updated_at=now,
     )
 
 
