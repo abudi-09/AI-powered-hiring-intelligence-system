@@ -149,3 +149,15 @@ async def delete_candidate(db: AsyncSession, candidate_id: uuid.UUID) -> None:
     candidate = await get_candidate_by_id(db, candidate_id)
     await db.delete(candidate)
     await db.commit()
+
+
+async def set_candidate_resume_path(
+    db: AsyncSession,
+    candidate_id: uuid.UUID,
+    resume_path: str,
+) -> Candidate:
+    candidate = await get_candidate_by_id(db, candidate_id)
+    candidate.resume_path = resume_path
+    await db.commit()
+    await db.refresh(candidate)
+    return candidate

@@ -23,6 +23,7 @@ from app.crud.candidate import (
     get_candidate_by_id as crud_get_candidate_by_id,
     list_candidates as crud_list_candidates,
     merge_candidate_skills as crud_merge_candidate_skills,
+    set_candidate_resume_path as crud_set_candidate_resume_path,
     update_candidate as crud_update_candidate,
 )
 from app.schemas.candidate import (
@@ -164,9 +165,11 @@ async def upload_candidate_resume(
 
     await _write_upload_file(resume, full_path)
 
-    candidate.resume_path = relative_path.as_posix()
-    await db.commit()
-    await db.refresh(candidate)
+    candidate = await crud_set_candidate_resume_path(
+        db,
+        candidate_id,
+        relative_path.as_posix(),
+    )
     return await _candidate_to_read(db, candidate)
 
 
