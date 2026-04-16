@@ -43,6 +43,8 @@ AllowedRoleDep = role_required(UserRole.Admin, UserRole.Recruiter, UserRole.Hiri
 
 
 _FILENAME_SAFE_RE: Final[re.Pattern[str]] = re.compile(r"[^A-Za-z0-9._-]+")
+_MAX_RESUME_BYTES: Final[int] = 5 * 1024 * 1024
+_ALLOWED_RESUME_EXTENSIONS: Final[set[str]] = {".txt", ".md", ".pdf"}
 
 
 def _safe_resume_filename(original_filename: str | None, candidate_id: uuid.UUID) -> str:
@@ -56,17 +58,55 @@ def _safe_resume_filename(original_filename: str | None, candidate_id: uuid.UUID
     return f"{candidate_id}_{uuid.uuid4().hex}{ext}"
 
 
-async def _write_upload_file(upload: UploadFile, destination: Path) -> None:
+async def _write_upload_file(upload: UploadFile, destination: Path) -> int:
+    total_bytes = 0
+
     def _write_sync() -> None:
+        nonlocal total_bytes
         destination.parent.mkdir(parents=True, exist_ok=True)
         with destination.open("wb") as f:
             while True:
                 chunk = upload.file.read(1024 * 1024)
                 if not chunk:
                     break
+                total_bytes += len(chunk)
+                if total_bytes > _MAX_RESUME_BYTES:
+                    raise OSError("resume too large")
                 f.write(chunk)
 
-    await anyio.to_thread.run_sync(_write_sync)
+    try:
+        await anyio.to_thread.run_sync(_write_sync)
+    except OSError:
+        if destination.exists():
+            destination.unlink()
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Resume file exceeds 5 MB limit",
+        ) from None
+
+    return total_bytes
+
+
+def _validate_resume_extension(filename: str | None) -> None:
+    ext = Path(filename or "").suffix.lower()
+    if ext not in _ALLOWED_RESUME_EXTENSIONS:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Resume must be a .txt, .md, or .pdf file",
+        )
+
+
+def _validate_resume_size(size_bytes: int) -> None:
+    if size_bytes <= 0:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Resume file is empty",
+        )
+    if size_bytes > _MAX_RESUME_BYTES:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Resume file exceeds 5 MB limit",
+        )
 
 
 async def _candidate_to_read(db: AsyncSession, candidate: Candidate) -> CandidateRead:
@@ -158,12 +198,15 @@ async def upload_candidate_resume(
 ) -> CandidateRead:
     candidate = await crud_get_candidate_by_id(db, candidate_id)
 
+    _validate_resume_extension(resume.filename)
+
     storage_root = settings.resume_storage_path
     filename = _safe_resume_filename(resume.filename, candidate_id)
     relative_path = Path(str(candidate_id)) / filename
     full_path = storage_root / relative_path
 
-    await _write_upload_file(resume, full_path)
+    written_bytes = await _write_upload_file(resume, full_path)
+    _validate_resume_size(written_bytes)
 
     candidate = await crud_set_candidate_resume_path(
         db,
