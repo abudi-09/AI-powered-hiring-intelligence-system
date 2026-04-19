@@ -35,12 +35,15 @@ async def test_list_jobs_filters_by_status() -> None:
         status=JobStatus.OPEN.value,
     )
     mock_db = AsyncMock()
-    mock_result = MagicMock()
-    mock_result.scalars.return_value.all.return_value = [open_job]
-    mock_db.execute = AsyncMock(return_value=mock_result)
+    count_result = MagicMock()
+    count_result.scalar_one.return_value = 1
+    list_result = MagicMock()
+    list_result.scalars.return_value.all.return_value = [open_job]
+    mock_db.execute = AsyncMock(side_effect=[count_result, list_result])
 
-    jobs = await list_jobs(mock_db, status=JobStatus.OPEN)
+    jobs, total = await list_jobs(mock_db, status=JobStatus.OPEN)
 
+    assert total == 1
     assert len(jobs) == 1
     assert jobs[0].status == JobStatus.OPEN.value
 

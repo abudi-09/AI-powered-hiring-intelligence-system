@@ -4,7 +4,7 @@ import uuid
 from typing import Iterable
 
 from fastapi import HTTPException, status
-from sqlalchemy import select
+from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.candidate import Candidate
@@ -55,9 +55,30 @@ async def get_candidate_by_id(db: AsyncSession, candidate_id: uuid.UUID) -> Cand
     return candidate
 
 
-async def list_candidates(db: AsyncSession) -> list[Candidate]:
-    result = await db.execute(select(Candidate).order_by(Candidate.created_at.desc()))
-    return list(result.scalars().all())
+async def list_candidates(
+    db: AsyncSession,
+    *,
+    skip: int = 0,
+    limit: int = 50,
+    q: str | None = None,
+) -> tuple[list[Candidate], int]:
+    query = select(Candidate)
+    if q:
+        pattern = f"%{q.strip()}%"
+        query = query.where(
+            or_(
+                Candidate.full_name.ilike(pattern),
+                Candidate.email.ilike(pattern),
+            )
+        )
+
+    count_result = await db.execute(select(func.count()).select_from(query.subquery()))
+    total = int(count_result.scalar_one())
+
+    result = await db.execute(
+        query.order_by(Candidate.created_at.desc()).offset(skip).limit(limit)
+    )
+    return list(result.scalars().all()), total
 
 
 async def create_candidate(db: AsyncSession, payload: CandidateCreate) -> Candidate:

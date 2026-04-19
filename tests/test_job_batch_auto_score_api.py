@@ -38,13 +38,15 @@ async def test_auto_score_job_matches_endpoint_returns_batch_result(
     job_id: uuid.UUID,
 ) -> None:
     candidate_id = uuid.UUID("00000000-0000-4000-8000-000000000051")
+    now = datetime.now(timezone.utc)
     match = MatchScore(
         id=uuid.uuid4(),
         candidate_id=candidate_id,
         job_id=job_id,
         score=91.5,
         explanation={"final_score": 91.5},
-        created_at=datetime.now(timezone.utc),
+        created_at=now,
+        updated_at=now,
     )
 
     mock_session = AsyncMock()

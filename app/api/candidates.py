@@ -33,6 +33,7 @@ from app.schemas.candidate import (
     CandidateSkillRead,
     ResumeSkillExtractionRead,
 )
+from app.schemas.pagination import PaginatedResponse
 from app.services.skill_extractor import SkillExtractor
 
 
@@ -139,13 +140,17 @@ async def _candidate_to_read(db: AsyncSession, candidate: Candidate) -> Candidat
     )
 
 
-@router.get("/", response_model=list[CandidateRead])
+@router.get("/", response_model=PaginatedResponse[CandidateRead])
 async def list_candidates(
     db: AsyncSession = Depends(get_db),
+    skip: int = 0,
+    limit: int = 50,
+    q: str | None = None,
     _: User = Depends(AllowedRoleDep),
-) -> list[CandidateRead]:
-    candidates = await crud_list_candidates(db)
-    return [await _candidate_to_read(db, c) for c in candidates]
+) -> PaginatedResponse[CandidateRead]:
+    candidates, total = await crud_list_candidates(db, skip=skip, limit=limit, q=q)
+    items = [await _candidate_to_read(db, candidate) for candidate in candidates]
+    return PaginatedResponse(items=items, total=total, skip=skip, limit=limit)
 
 
 @router.post("/", response_model=CandidateRead, status_code=status.HTTP_201_CREATED)

@@ -14,6 +14,7 @@ from app.models.skill import Skill
 from app.models.user import User, UserRole
 from app.schemas.job import JobCreate, JobRead, JobUpdate, JobSkillRead
 from app.schemas.match import JobBatchAutoScoreRequest, JobBatchAutoScoreResponse
+from app.schemas.pagination import PaginatedResponse
 from app.crud.job import create_job as crud_create_job, delete_job as crud_delete_job, list_jobs as crud_list_jobs, update_job as crud_update_job, get_job_by_id as crud_get_job_by_id
 from app.crud.match import batch_auto_score_job_matches
 
@@ -52,14 +53,18 @@ async def _job_to_read(db: AsyncSession, job: Job) -> JobRead:
 ## association management now handled in CRUD layer
 
 
-@router.get("/", response_model=list[JobRead])
+@router.get("/", response_model=PaginatedResponse[JobRead])
 async def list_jobs(
     db: AsyncSession = Depends(get_db),
+    skip: int = 0,
+    limit: int = 50,
+    q: str | None = None,
     status: JobStatus | None = None,
     _: User = Depends(AllowedRoleDep),
-) -> list[JobRead]:
-    jobs = await crud_list_jobs(db, status=status)
-    return [await _job_to_read(db, job) for job in jobs]
+) -> PaginatedResponse[JobRead]:
+    jobs, total = await crud_list_jobs(db, skip=skip, limit=limit, q=q, status=status)
+    items = [await _job_to_read(db, job) for job in jobs]
+    return PaginatedResponse(items=items, total=total, skip=skip, limit=limit)
 
 
 @router.post("/", response_model=JobRead, status_code=status.HTTP_201_CREATED)

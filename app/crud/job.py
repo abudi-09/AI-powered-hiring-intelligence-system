@@ -4,7 +4,7 @@ import uuid
 from typing import Iterable
 
 from fastapi import HTTPException, status
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.job import Job
@@ -56,12 +56,28 @@ async def get_job_by_id(db: AsyncSession, job_id: uuid.UUID) -> Job:
     return job
 
 
-async def list_jobs(db: AsyncSession, status: JobStatus | None = None) -> list[Job]:
+async def list_jobs(
+    db: AsyncSession,
+    *,
+    skip: int = 0,
+    limit: int = 50,
+    q: str | None = None,
+    status: JobStatus | None = None,
+) -> tuple[list[Job], int]:
     query = select(Job)
+    if q:
+        pattern = f"%{q.strip()}%"
+        query = query.where(Job.title.ilike(pattern))
     if status is not None:
         query = query.where(Job.status == status.value)
-    result = await db.execute(query.order_by(Job.created_at.desc()))
-    return list(result.scalars().all())
+
+    count_result = await db.execute(select(func.count()).select_from(query.subquery()))
+    total = int(count_result.scalar_one())
+
+    result = await db.execute(
+        query.order_by(Job.created_at.desc()).offset(skip).limit(limit)
+    )
+    return list(result.scalars().all()), total
 
 
 async def create_job(db: AsyncSession, payload: JobCreate, owner_id: uuid.UUID) -> Job:
