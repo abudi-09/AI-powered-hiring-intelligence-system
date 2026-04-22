@@ -24,6 +24,23 @@ def normalize_weight(weight: float | None) -> float:
     return max(weight, 0.0)
 
 
+_LEVEL_MULTIPLIERS: dict[str, float] = {
+    "beginner": 0.85,
+    "junior": 0.9,
+    "mid": 1.0,
+    "intermediate": 1.0,
+    "senior": 1.1,
+    "expert": 1.15,
+    "lead": 1.2,
+}
+
+
+def level_multiplier(level: str | None) -> float:
+    if not level:
+        return 1.0
+    return _LEVEL_MULTIPLIERS.get(level.lower(), 1.0)
+
+
 def calculate_weighted_match_score(
     job_skills: list[JobSkillInput],
     candidate_skills: list[CandidateSkillInput],
@@ -31,7 +48,7 @@ def calculate_weighted_match_score(
     """Compute weighted candidate-job compatibility from skill overlap."""
     if not job_skills:
         return 0.0, {
-            "strategy": "skill_overlap_weighted_v1",
+            "strategy": "skill_overlap_weighted_v2",
             "reason": "Job has no required skills",
             "matched_skills": [],
             "missing_skills": [],
@@ -63,7 +80,9 @@ def calculate_weighted_match_score(
             )
             continue
 
-        matched_weight += weight
+        level_mult = level_multiplier(candidate_skill.level)
+        level_adjusted_weight = weight * level_mult
+        matched_weight += level_adjusted_weight
         years_exp = candidate_skill.years_experience or 0.0
         exp_bonus = min(years_exp * 2.0, 10.0)
         experience_bonus += exp_bonus
@@ -73,6 +92,8 @@ def calculate_weighted_match_score(
                 "skill_name": job_skill.skill_name,
                 "weight": weight,
                 "level": candidate_skill.level,
+                "level_multiplier": level_mult,
+                "adjusted_weight": round(level_adjusted_weight, 2),
                 "years_experience": years_exp,
                 "experience_bonus": exp_bonus,
             }
@@ -83,7 +104,7 @@ def calculate_weighted_match_score(
     final_score = max(0.0, min(100.0, base_score + experience_bonus - missing_penalty))
 
     explanation = {
-        "strategy": "skill_overlap_weighted_v1",
+        "strategy": "skill_overlap_weighted_v2",
         "matched_skills": matched_skills,
         "missing_skills": missing_skills,
         "weighted_contribution": round(base_score, 2),

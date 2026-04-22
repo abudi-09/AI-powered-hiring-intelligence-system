@@ -6,6 +6,7 @@ from app.services.scoring import (
     CandidateSkillInput,
     JobSkillInput,
     calculate_weighted_match_score,
+    level_multiplier,
     normalize_weight,
 )
 
@@ -68,3 +69,33 @@ def test_missing_required_skill_applies_penalty() -> None:
     assert score < 100.0
     assert explanation["total_missing"] == 1
     assert explanation["missing_penalty"] == pytest.approx(5.0)
+
+
+def test_senior_skill_level_increases_match_score() -> None:
+    skill_id = str(uuid.uuid4())
+    junior_score, _ = calculate_weighted_match_score(
+        [JobSkillInput(skill_id=skill_id, skill_name="Python", weight=1.0)],
+        [
+            CandidateSkillInput(
+                skill_id=skill_id,
+                skill_name="Python",
+                level="junior",
+                years_experience=0.0,
+            )
+        ],
+    )
+    senior_score, senior_explanation = calculate_weighted_match_score(
+        [JobSkillInput(skill_id=skill_id, skill_name="Python", weight=1.0)],
+        [
+            CandidateSkillInput(
+                skill_id=skill_id,
+                skill_name="Python",
+                level="senior",
+                years_experience=0.0,
+            )
+        ],
+    )
+
+    assert senior_score > junior_score
+    assert senior_explanation["matched_skills"][0]["level_multiplier"] == pytest.approx(1.1)
+    assert level_multiplier("senior") == pytest.approx(1.1)
