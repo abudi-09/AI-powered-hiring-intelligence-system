@@ -116,7 +116,11 @@ class SkillExtractor:
         return terms
 
     def _term_in_text(self, text: str, term: str) -> bool:
-        pattern = re.compile(rf"\b{re.escape(term)}\b", re.IGNORECASE)
+        escaped = re.escape(term)
+        if re.search(r"[^\w\s.+-]", term) or term in {".NET", "C++", "Node.js"}:
+            pattern = re.compile(rf"(?<![A-Za-z0-9]){escaped}(?![A-Za-z0-9])", re.IGNORECASE)
+        else:
+            pattern = re.compile(rf"\b{escaped}\b", re.IGNORECASE)
         return pattern.search(text) is not None
 
     def _find_years(self, contexts: list[str], term: str) -> float | None:

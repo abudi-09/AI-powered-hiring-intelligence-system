@@ -117,5 +117,22 @@ def test_returns_sorted_skill_names(extractor: SkillExtractor) -> None:
     assert [item.skill_name for item in extracted] == ["Python", "React", "SQL"]
 
 
+def test_extracts_c_plus_plus_without_word_boundaries(extractor: SkillExtractor) -> None:
+    text = "Systems programming in C++ for 5 years."
+    extracted = extractor.extract_from_text(text, ["C++", "Python"])
+
+    assert len(extracted) == 1
+    assert extracted[0].skill_name == "C++"
+    assert extracted[0].years_experience == pytest.approx(5.0)
+
+
+def test_extracts_dotnet_skill_name(extractor: SkillExtractor) -> None:
+    text = "Backend built with .NET and SQL."
+    extracted = extractor.extract_from_text(text, [".NET", "SQL"])
+    names = {item.skill_name for item in extracted}
+
+    assert names == {".NET", "SQL"}
+
+
 def test_extract_skills_section_returns_none_without_header(extractor: SkillExtractor) -> None:
     assert extractor._extract_skills_section("General developer profile.") is None
