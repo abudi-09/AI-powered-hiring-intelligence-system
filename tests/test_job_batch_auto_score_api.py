@@ -6,6 +6,7 @@ import pytest
 from httpx import ASGITransport, AsyncClient
 
 from app.core.security import create_access_token, get_password_hash
+from app.crud.match import BatchAutoScoreResult
 from app.db.session import get_db
 from app.main import create_app
 from app.models.match import MatchScore
@@ -65,7 +66,12 @@ async def test_auto_score_job_matches_endpoint_returns_batch_result(
     with patch(
         "app.api.jobs.batch_auto_score_job_matches",
         new_callable=AsyncMock,
-        return_value=[match],
+        return_value=BatchAutoScoreResult(
+            matches=[match],
+            scored_count=1,
+            skipped_count=0,
+            total_candidates=1,
+        ),
     ) as batch_score:
         transport = ASGITransport(app=app)
         async with AsyncClient(transport=transport, base_url="http://testserver") as client:
@@ -81,6 +87,8 @@ async def test_auto_score_job_matches_endpoint_returns_batch_result(
     body = response.json()
     assert body["job_id"] == str(job_id)
     assert body["scored_count"] == 1
+    assert body["skipped_count"] == 0
+    assert body["total_candidates"] == 1
     assert body["matches"][0]["score"] == pytest.approx(91.5)
     batch_score.assert_awaited_once_with(mock_session, job_id, [candidate_id])
 

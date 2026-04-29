@@ -5,7 +5,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 from fastapi import HTTPException
 
-from app.crud.match import batch_auto_score_job_matches
+from app.crud.match import BatchAutoScoreResult, batch_auto_score_job_matches
 from app.models.match import MatchScore
 
 
@@ -54,10 +54,13 @@ async def test_batch_auto_score_scores_all_candidates() -> None:
             new_callable=AsyncMock,
             side_effect=[match_b, match_a],
         ) as upsert:
-            matches = await batch_auto_score_job_matches(mock_db, job_id)
+            result = await batch_auto_score_job_matches(mock_db, job_id)
 
-    assert len(matches) == 2
-    assert [match.score for match in matches] == [88.0, 62.0]
+    assert len(result.matches) == 2
+    assert [match.score for match in result.matches] == [88.0, 62.0]
+    assert result.scored_count == 2
+    assert result.skipped_count == 0
+    assert result.total_candidates == 2
     assert upsert.await_count == 2
     upsert.assert_any_await(
         mock_db,
@@ -97,14 +100,14 @@ async def test_batch_auto_score_filters_requested_candidates() -> None:
             new_callable=AsyncMock,
             return_value=match,
         ):
-            matches = await batch_auto_score_job_matches(
+            result = await batch_auto_score_job_matches(
                 mock_db,
                 job_id,
                 candidate_ids=[candidate_id],
             )
 
-    assert len(matches) == 1
-    assert matches[0].candidate_id == candidate_id
+    assert len(result.matches) == 1
+    assert result.matches[0].candidate_id == candidate_id
 
 
 @pytest.mark.asyncio
@@ -120,10 +123,48 @@ async def test_batch_auto_score_returns_empty_when_no_candidates() -> None:
 
     mock_db.execute = AsyncMock(side_effect=[job_result, candidates_result])
 
-    matches = await batch_auto_score_job_matches(mock_db, job_id)
+    result = await batch_auto_score_job_matches(mock_db, job_id)
 
-    assert matches == []
+    assert result.matches == []
+    assert result.scored_count == 0
     mock_db.commit.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_batch_auto_score_skips_duplicate_candidate_ids() -> None:
+    job_id = uuid.uuid4()
+    candidate_id = uuid.uuid4()
+    mock_db = AsyncMock()
+
+    job_result = MagicMock()
+    job_result.scalar_one_or_none.return_value = job_id
+
+    existing_result = MagicMock()
+    existing_result.scalars.return_value.all.return_value = [candidate_id]
+
+    mock_db.execute = AsyncMock(side_effect=[job_result, existing_result])
+
+    match = _match_row(candidate_id, job_id, 75.0)
+
+    with patch(
+        "app.crud.match.MatchEngine.calculate_match_score",
+        new_callable=AsyncMock,
+        return_value=(75.0, {"final_score": 75.0}),
+    ):
+        with patch(
+            "app.crud.match.upsert_match_score",
+            new_callable=AsyncMock,
+            return_value=match,
+        ):
+            result = await batch_auto_score_job_matches(
+                mock_db,
+                job_id,
+                candidate_ids=[candidate_id, candidate_id],
+            )
+
+    assert result.scored_count == 1
+    assert result.skipped_count == 1
+    assert result.total_candidates == 2
 
 
 @pytest.mark.asyncio

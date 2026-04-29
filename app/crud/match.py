@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import uuid
+from dataclasses import dataclass
 
 from fastapi import HTTPException, status
 from sqlalchemy import func, select
@@ -11,6 +12,14 @@ from app.models.candidate import Candidate
 from app.models.job import Job
 from app.models.match import MatchScore
 from app.services.match_engine import MatchEngine
+
+
+@dataclass(frozen=True)
+class BatchAutoScoreResult:
+    matches: list[MatchScore]
+    scored_count: int
+    skipped_count: int
+    total_candidates: int
 
 
 async def calculate_match_score(
@@ -77,18 +86,28 @@ async def batch_auto_score_job_matches(
     db: AsyncSession,
     job_id: uuid.UUID,
     candidate_ids: list[uuid.UUID] | None = None,
-) -> list[MatchScore]:
+) -> BatchAutoScoreResult:
     """Score all candidates (or a subset) against a job and persist match rows."""
     await _validate_job_exists(db, job_id)
+    skipped_count = 0
 
     if candidate_ids is None:
         result = await db.execute(select(Candidate.id))
         candidate_ids = [row[0] for row in result.all()]
     else:
         await _validate_candidates_exist(db, candidate_ids)
+        total_requested = len(candidate_ids)
+        candidate_ids = list(dict.fromkeys(candidate_ids))
+        skipped_count = total_requested - len(candidate_ids)
 
+    total_candidates = len(candidate_ids)
     if not candidate_ids:
-        return []
+        return BatchAutoScoreResult(
+            matches=[],
+            scored_count=0,
+            skipped_count=skipped_count,
+            total_candidates=total_candidates + skipped_count,
+        )
 
     engine = MatchEngine(db)
     matches: list[MatchScore] = []
@@ -108,7 +127,12 @@ async def batch_auto_score_job_matches(
 
     await db.commit()
     matches.sort(key=lambda item: item.score, reverse=True)
-    return matches
+    return BatchAutoScoreResult(
+        matches=matches,
+        scored_count=len(matches),
+        skipped_count=skipped_count,
+        total_candidates=total_candidates + skipped_count,
+    )
 
 
 async def get_matches_by_job(db: AsyncSession, job_id: uuid.UUID) -> list[MatchScore]:

@@ -122,9 +122,11 @@ async def auto_score_job_matches(
 ) -> JobBatchAutoScoreResponse:
     """Calculate and store match scores for all candidates against a job."""
     candidate_ids = payload.candidate_ids if payload is not None else None
-    matches = await batch_auto_score_job_matches(db, job_id, candidate_ids)
+    result = await batch_auto_score_job_matches(db, job_id, candidate_ids)
     return JobBatchAutoScoreResponse(
         job_id=job_id,
-        scored_count=len(matches),
-        matches=matches,
+        scored_count=result.scored_count,
+        skipped_count=result.skipped_count,
+        total_candidates=result.total_candidates,
+        matches=result.matches,
     )

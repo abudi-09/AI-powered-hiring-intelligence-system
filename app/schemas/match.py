@@ -37,6 +37,8 @@ class JobBatchAutoScoreRequest(BaseModel):
 class JobBatchAutoScoreResponse(BaseModel):
     job_id: uuid.UUID
     scored_count: int
+    skipped_count: int
+    total_candidates: int
     matches: list[MatchScoreRead]
 
 
