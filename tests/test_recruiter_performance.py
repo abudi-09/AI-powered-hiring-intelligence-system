@@ -23,8 +23,7 @@ async def test_calculate_recruiter_performance_aggregates_job_metrics(
             all_result([(job_a,), (job_b,)]),
             scalar_result(3),
             all_result([(85.0,), (72.0,), (55.0,)]),
-            scalar_result(80.0),
-            scalar_result(60.0),
+            all_result([(job_a, 80.0), (job_b, 60.0)]),
         ]
     )
 

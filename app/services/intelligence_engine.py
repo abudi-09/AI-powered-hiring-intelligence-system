@@ -109,19 +109,25 @@ class IntelligenceEngine:
         )
         skill_ids = [row[0] for row in job_skills_data_result.all()]
 
-        for skill_id in skill_ids:
+        if skill_ids:
             demand_result = await db.execute(
-                select(func.count(JobSkill.job_id))
-                .where(JobSkill.skill_id == skill_id)
+                select(JobSkill.skill_id, func.count(JobSkill.job_id))
+                .where(JobSkill.skill_id.in_(skill_ids))
+                .group_by(JobSkill.skill_id)
             )
-            demand = demand_result.scalar() or 0
+            demand_by_skill = {row[0]: row[1] for row in demand_result.all()}
 
             supply_result = await db.execute(
-                select(func.count(CandidateSkill.candidate_id))
-                .where(CandidateSkill.skill_id == skill_id)
+                select(CandidateSkill.skill_id, func.count(CandidateSkill.candidate_id))
+                .where(CandidateSkill.skill_id.in_(skill_ids))
+                .group_by(CandidateSkill.skill_id)
             )
-            supply = supply_result.scalar() or 0
-            skill_scarcity_scores.append(skill_scarcity_index(demand=demand, supply=supply))
+            supply_by_skill = {row[0]: row[1] for row in supply_result.all()}
+
+            for skill_id in skill_ids:
+                demand = demand_by_skill.get(skill_id, 0)
+                supply = supply_by_skill.get(skill_id, 0)
+                skill_scarcity_scores.append(skill_scarcity_index(demand=demand, supply=supply))
 
         skill_scarcity_index_value = round(
             sum(skill_scarcity_scores) / len(skill_scarcity_scores), 2
@@ -484,24 +490,27 @@ class IntelligenceEngine:
             rec_scores = []
 
         # Simulate avg time to hire (based on job difficulty)
-        # In real system, this would be calculated from actual hire dates
         time_to_hire_days = []
-        for job_id in job_ids:
-            # Get job difficulty from match scores
-            match_result = await db.execute(
-                select(func.avg(MatchScore.score))
-                .where(MatchScore.job_id == job_id)
+        if job_ids:
+            match_avg_result = await db.execute(
+                select(MatchScore.job_id, func.avg(MatchScore.score))
+                .where(MatchScore.job_id.in_(job_ids))
+                .group_by(MatchScore.job_id)
             )
-            avg_match = match_result.scalar() or 50
+            avg_match_by_job = {
+                row[0]: float(row[1]) if row[1] is not None else 50.0
+                for row in match_avg_result.all()
+            }
 
-            # Lower match scores = harder to hire = more time
-            # Base: 30 days, +1 day per point below 70
-            if avg_match < 70:
-                days = 30 + (70 - avg_match)
-            else:
-                days = 30 - (avg_match - 70) * 0.3  # Faster if good matches
-            
-            time_to_hire_days.append(max(days, 7))  # Minimum 7 days
+            for job_id in job_ids:
+                avg_match = avg_match_by_job.get(job_id, 50.0)
+
+                if avg_match < 70:
+                    days = 30 + (70 - avg_match)
+                else:
+                    days = 30 - (avg_match - 70) * 0.3
+
+                time_to_hire_days.append(max(days, 7))
 
         avg_time_to_hire = round(
             sum(time_to_hire_days) / len(time_to_hire_days), 2

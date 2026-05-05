@@ -33,10 +33,8 @@ async def test_calculate_job_intelligence_combines_match_and_scarcity(job_id: uu
             scalar_result(2),
             all_result([(82.0,), (74.0,)]),
             all_result([(skill_a,), (skill_b,)]),
-            scalar_result(4),
-            scalar_result(2),
-            scalar_result(3),
-            scalar_result(1),
+            all_result([(skill_a, 4), (skill_b, 3)]),
+            all_result([(skill_a, 2), (skill_b, 1)]),
         ]
     )
 
