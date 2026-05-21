@@ -1,7 +1,11 @@
+#!/usr/bin/env python3
+"""Create the first admin or recruiter account."""
+
 from __future__ import annotations
 
 import argparse
 import asyncio
+import sys
 
 from sqlalchemy import select
 
@@ -10,60 +14,42 @@ from app.db.session import AsyncSessionLocal
 from app.models.user import User, UserRole
 
 
-def _validate_password(password: str) -> None:
-    if len(password) < 8:
-        raise ValueError("Password must be at least 8 characters")
-    if len(password.encode("utf-8")) > 72:
-        raise ValueError("Password too long (bcrypt max is 72 bytes)")
-    if not any(ch.isalpha() for ch in password) or not any(ch.isdigit() for ch in password):
-        raise ValueError("Password must contain at least one letter and one number")
-
-
-async def _run(email: str, password: str, full_name: str) -> None:
-    _validate_password(password)
-
-    async with AsyncSessionLocal() as session:
-        existing = await session.execute(select(User).where(User.email == email))
-        user = existing.scalar_one_or_none()
-
-        if user is not None:
-            # Ensure existing user is admin + active
-            changed = False
-            if user.role != UserRole.Admin:
-                user.role = UserRole.Admin
-                changed = True
-            if not user.is_active:
-                user.is_active = True
-                changed = True
-            if changed:
-                await session.commit()
-                await session.refresh(user)
-            print(f"Admin ready: {user.email} ({user.id})")
-            return
+async def create_user(email: str, password: str, full_name: str, role: UserRole) -> int:
+    async with AsyncSessionLocal() as db:
+        existing = await db.execute(select(User).where(User.email == email))
+        if existing.scalar_one_or_none() is not None:
+            print(f"User already exists: {email}")
+            return 1
 
         user = User(
-            full_name=full_name,
             email=email,
             hashed_password=get_password_hash(password),
-            role=UserRole.Admin,
+            full_name=full_name,
+            role=role,
             is_active=True,
         )
-        session.add(user)
-        await session.commit()
-        await session.refresh(user)
+        db.add(user)
+        await db.commit()
+        await db.refresh(user)
 
-    print(f"Admin created: {user.email} ({user.id})")
+    print(f"Created {role.value} user {email} ({user.id})")
+    return 0
 
 
-def main() -> None:
-    parser = argparse.ArgumentParser(description="Create or promote an Admin user")
+def main() -> int:
+    parser = argparse.ArgumentParser(description="Bootstrap an admin or recruiter user")
     parser.add_argument("--email", required=True)
     parser.add_argument("--password", required=True)
-    parser.add_argument("--full-name", default="Admin")
+    parser.add_argument("--name", default="Admin User")
+    parser.add_argument(
+        "--role",
+        default="Admin",
+        choices=[role.value for role in (UserRole.Admin, UserRole.Recruiter)],
+    )
     args = parser.parse_args()
-
-    asyncio.run(_run(args.email, args.password, args.full_name))
+    role = UserRole(args.role)
+    return asyncio.run(create_user(args.email, args.password, args.name, role))
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())
