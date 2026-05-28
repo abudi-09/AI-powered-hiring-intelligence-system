@@ -23,6 +23,8 @@ services:
       ACCESS_TOKEN_EXPIRE_MINUTES: 60
       RESUME_STORAGE_PATH: /app/storage/resumes
       APP_ENV: development
+    volumes:
+      - resume_data:/app/storage/resumes
     depends_on:
       db:
         condition: service_healthy
@@ -32,3 +34,6 @@ services:
       timeout: 5s
       retries: 5
       start_period: 20s
+
+volumes:
+  resume_data:
