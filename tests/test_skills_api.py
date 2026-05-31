@@ -129,3 +129,60 @@ async def test_skills_list_allows_recruiter(recruiter_user: User) -> None:
 
     assert response.status_code == 200
     assert response.json()[0]["name"] == "Python"
+
+
+@pytest.mark.asyncio
+async def test_get_update_and_delete_skill_routes(admin_user: User) -> None:
+    skill_id = uuid.uuid4()
+    skill = Skill(
+        id=skill_id,
+        name="Python",
+        category="Language",
+        created_at=datetime.now(timezone.utc),
+    )
+    mock_session = AsyncMock()
+    user_result = MagicMock()
+    user_result.scalar_one_or_none.return_value = admin_user
+    mock_session.execute = AsyncMock(return_value=user_result)
+
+    app = create_app()
+
+    async def override_get_db():
+        yield mock_session
+
+    app.dependency_overrides[get_db] = override_get_db
+    token = create_access_token(subject=str(admin_user.id), role=admin_user.role.value)
+
+    with patch(
+        "app.api.skills.get_skill_by_id",
+        new_callable=AsyncMock,
+        return_value=skill,
+    ), patch(
+        "app.api.skills.update_skill",
+        new_callable=AsyncMock,
+        return_value=skill,
+    ), patch(
+        "app.api.skills.delete_skill",
+        new_callable=AsyncMock,
+    ):
+        transport = ASGITransport(app=app)
+        async with AsyncClient(transport=transport, base_url="http://testserver") as client:
+            get_response = await client.get(
+                f"/skills/{skill_id}",
+                headers={"Authorization": f"Bearer {token}"},
+            )
+            patch_response = await client.put(
+                f"/skills/{skill_id}",
+                headers={"Authorization": f"Bearer {token}"},
+                json={"category": "Backend"},
+            )
+            delete_response = await client.delete(
+                f"/skills/{skill_id}",
+                headers={"Authorization": f"Bearer {token}"},
+            )
+
+    app.dependency_overrides.clear()
+
+    assert get_response.status_code == 200
+    assert patch_response.status_code == 200
+    assert delete_response.status_code == 204

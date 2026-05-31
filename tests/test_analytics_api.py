@@ -114,3 +114,74 @@ async def test_analytics_routes_require_authentication() -> None:
         response = await client.get("/analytics/skills/demand")
 
     assert response.status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_candidate_analytics_endpoint_returns_snapshot(analytics_client) -> None:
+    client, token = analytics_client
+    candidate_id = uuid.uuid4()
+    payload = {
+        "candidate_id": str(candidate_id),
+        "candidate_name": "Jane Doe",
+        "best_job_score": 88.0,
+        "average_score": 72.0,
+        "versatility_score": 4,
+        "skill_gap_count": 2,
+        "matched_job_count": 3,
+    }
+
+    with patch(
+        "app.api.analytics.get_candidate_analytics",
+        new_callable=AsyncMock,
+        return_value=payload,
+    ):
+        response = await client.get(
+            f"/analytics/candidates/{candidate_id}",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+
+    assert response.status_code == 200
+    assert response.json()["candidate_name"] == "Jane Doe"
+
+
+@pytest.mark.asyncio
+async def test_skill_scarcity_and_match_distribution_endpoints(analytics_client) -> None:
+    client, token = analytics_client
+    scarcity_rows = [
+        {
+            "skill_id": str(uuid.uuid4()),
+            "skill_name": "Rust",
+            "demand_count": 6,
+            "supply_count": 1,
+            "scarcity_ratio": 6.0,
+        }
+    ]
+    distribution = {
+        "total_matches": 12,
+        "average_score": 70.0,
+        "median_bucket": "60-79",
+        "buckets": [{"range_start": 60, "range_end": 79, "count": 5, "percentage": 41.7}],
+    }
+
+    with patch(
+        "app.api.analytics.get_skill_scarcity",
+        new_callable=AsyncMock,
+        return_value=scarcity_rows,
+    ), patch(
+        "app.api.analytics.get_match_distribution",
+        new_callable=AsyncMock,
+        return_value=distribution,
+    ):
+        scarcity_response = await client.get(
+            "/analytics/skills/scarcity",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        distribution_response = await client.get(
+            "/analytics/matches/distribution",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+
+    assert scarcity_response.status_code == 200
+    assert scarcity_response.json()[0]["skill_name"] == "Rust"
+    assert distribution_response.status_code == 200
+    assert distribution_response.json()["total_matches"] == 12

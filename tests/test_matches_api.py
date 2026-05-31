@@ -127,3 +127,65 @@ async def test_matches_routes_require_authentication() -> None:
         response = await client.get(f"/matches/by-job/{job_id}")
 
     assert response.status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_manual_score_and_list_match_routes(matches_client) -> None:
+    client, token = matches_client
+    candidate_id = uuid.uuid4()
+    job_id = uuid.uuid4()
+    now = datetime.now(timezone.utc)
+    match = MatchScore(
+        id=uuid.uuid4(),
+        candidate_id=candidate_id,
+        job_id=job_id,
+        score=77.0,
+        explanation={"final_score": 77.0},
+        created_at=now,
+        updated_at=now,
+    )
+
+    with patch(
+        "app.api.matches.upsert_match_score",
+        new_callable=AsyncMock,
+        return_value=match,
+    ), patch(
+        "app.api.matches.get_matches_by_job",
+        new_callable=AsyncMock,
+        return_value=[match],
+    ), patch(
+        "app.api.matches.get_matches_by_candidate",
+        new_callable=AsyncMock,
+        return_value=[match],
+    ), patch(
+        "app.api.matches.get_top_jobs",
+        new_callable=AsyncMock,
+        return_value=[match],
+    ):
+        manual_response = await client.post(
+            "/matches/manual",
+            headers={"Authorization": f"Bearer {token}"},
+            json={
+                "candidate_id": str(candidate_id),
+                "job_id": str(job_id),
+                "score": 77.0,
+                "explanation": {"final_score": 77.0},
+            },
+        )
+        by_job_response = await client.get(
+            f"/matches/by-job/{job_id}",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        by_candidate_response = await client.get(
+            f"/matches/by-candidate/{candidate_id}",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        top_jobs_response = await client.get(
+            f"/matches/top-jobs/{candidate_id}?limit=3",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+
+    assert manual_response.status_code == 201
+    assert by_job_response.status_code == 200
+    assert by_candidate_response.status_code == 200
+    assert top_jobs_response.status_code == 200

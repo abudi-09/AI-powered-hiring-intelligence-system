@@ -107,3 +107,130 @@ async def test_list_candidates_crud_applies_search_filter() -> None:
 
     assert total == 1
     assert len(candidates) == 1
+
+
+@pytest.mark.asyncio
+async def test_create_get_update_delete_candidate_routes(recruiter_user: User) -> None:
+    candidate_id = uuid.uuid4()
+    now = datetime.now(timezone.utc)
+    candidate = Candidate(
+        id=candidate_id,
+        full_name="Jane Doe",
+        email="jane@example.com",
+        resume_path=None,
+        created_at=now,
+        updated_at=now,
+    )
+    candidate_read = CandidateRead(
+        id=candidate_id,
+        full_name="Jane Doe",
+        email="jane@example.com",
+        resume_path=None,
+        skills=[],
+        created_at=now,
+        updated_at=now,
+    )
+
+    mock_session = AsyncMock()
+    user_result = MagicMock()
+    user_result.scalar_one_or_none.return_value = recruiter_user
+    mock_session.execute = AsyncMock(return_value=user_result)
+
+    app = create_app()
+
+    async def override_get_db():
+        yield mock_session
+
+    app.dependency_overrides[get_db] = override_get_db
+    token = create_access_token(subject=str(recruiter_user.id), role=recruiter_user.role.value)
+
+    with patch(
+        "app.api.candidates.crud_create_candidate",
+        new_callable=AsyncMock,
+        return_value=candidate,
+    ), patch(
+        "app.api.candidates.crud_get_candidate_by_id",
+        new_callable=AsyncMock,
+        return_value=candidate,
+    ), patch(
+        "app.api.candidates.crud_update_candidate",
+        new_callable=AsyncMock,
+        return_value=candidate,
+    ), patch(
+        "app.api.candidates.crud_delete_candidate",
+        new_callable=AsyncMock,
+    ), patch(
+        "app.api.candidates._candidate_to_read",
+        new_callable=AsyncMock,
+        return_value=candidate_read,
+    ):
+        transport = ASGITransport(app=app)
+        async with AsyncClient(transport=transport, base_url="http://testserver") as client:
+            create_response = await client.post(
+                "/candidates/",
+                headers={"Authorization": f"Bearer {token}"},
+                json={"full_name": "Jane Doe", "email": "jane@example.com"},
+            )
+            get_response = await client.get(
+                f"/candidates/{candidate_id}",
+                headers={"Authorization": f"Bearer {token}"},
+            )
+            patch_response = await client.patch(
+                f"/candidates/{candidate_id}",
+                headers={"Authorization": f"Bearer {token}"},
+                json={"full_name": "Jane Smith"},
+            )
+            delete_response = await client.delete(
+                f"/candidates/{candidate_id}",
+                headers={"Authorization": f"Bearer {token}"},
+            )
+
+    app.dependency_overrides.clear()
+
+    assert create_response.status_code == 201
+    assert get_response.status_code == 200
+    assert patch_response.status_code == 200
+    assert delete_response.status_code == 204
+
+
+@pytest.mark.asyncio
+async def test_upload_candidate_resume_rejects_invalid_extension(recruiter_user: User) -> None:
+    candidate_id = uuid.uuid4()
+    candidate = Candidate(
+        id=candidate_id,
+        full_name="Jane Doe",
+        email="jane@example.com",
+        resume_path=None,
+        created_at=datetime.now(timezone.utc),
+        updated_at=datetime.now(timezone.utc),
+    )
+    mock_session = AsyncMock()
+    user_result = MagicMock()
+    user_result.scalar_one_or_none.return_value = recruiter_user
+    mock_session.execute = AsyncMock(return_value=user_result)
+
+    app = create_app()
+
+    async def override_get_db():
+        yield mock_session
+
+    app.dependency_overrides[get_db] = override_get_db
+    token = create_access_token(subject=str(recruiter_user.id), role=recruiter_user.role.value)
+
+    with patch(
+        "app.api.candidates.crud_get_candidate_by_id",
+        new_callable=AsyncMock,
+        return_value=candidate,
+    ):
+        transport = ASGITransport(app=app)
+        async with AsyncClient(transport=transport, base_url="http://testserver") as client:
+            response = await client.post(
+                f"/candidates/{candidate_id}/resume",
+                headers={"Authorization": f"Bearer {token}"},
+                files={"resume": ("resume.exe", b"binary", "application/octet-stream")},
+            )
+
+    app.dependency_overrides.clear()
+
+    assert response.status_code == 400
+    assert "Resume must be" in response.json()["detail"]
