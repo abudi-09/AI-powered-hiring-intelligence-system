@@ -45,6 +45,41 @@ def check_git_present() -> list[str]:
     return []
 
 
+def check_dockerignore_allows_git() -> list[str]:
+    path = ROOT / ".dockerignore"
+    if not path.exists():
+        return []
+    lines = [
+        line.strip()
+        for line in path.read_text(encoding="utf-8").splitlines()
+        if line.strip() and not line.strip().startswith("#")
+    ]
+    blocked = {".git", ".git/", ".git/**"}
+    if any(line in blocked or line.rstrip("/") == ".git" for line in lines):
+        return [".dockerignore must not exclude .git/ (Silver task runs need git history)"]
+    return []
+
+
+def check_dockerfile_basics() -> list[str]:
+    path = ROOT / "Dockerfile"
+    if not path.exists():
+        return []
+    errors: list[str] = []
+    text = path.read_text(encoding="utf-8")
+    if len(text.encode("utf-8")) > 20 * 1024:
+        errors.append("Dockerfile exceeds Silver 20 KB size limit")
+    if text.count("\n") + 1 > 200:
+        errors.append("Dockerfile exceeds Silver 200 line limit")
+    if "COPY . ." not in text:
+        errors.append("Dockerfile should use COPY . . at repo root")
+    if "--no-install-recommends" not in text:
+        errors.append("Dockerfile apt-get lines must use --no-install-recommends")
+    first_from = next((line for line in text.splitlines() if line.strip().startswith("FROM")), "")
+    if first_from and (first_from.endswith(":latest") or first_from.strip() == "FROM python"):
+        errors.append("Dockerfile base image must be pinned (no :latest or bare tag)")
+    return errors
+
+
 def check_forbidden_tracked() -> list[str]:
     errors: list[str] = []
     for relative in FORBIDDEN_TRACKED:
@@ -77,6 +112,8 @@ def main() -> int:
     errors = [
         *check_paths(),
         *check_git_present(),
+        *check_dockerignore_allows_git(),
+        *check_dockerfile_basics(),
         *check_forbidden_tracked(),
     ]
 
@@ -95,10 +132,12 @@ def main() -> int:
     print("Submission checks passed.")
     print(output.splitlines()[-1] if output else "pytest completed")
     print("\nUpload checklist:")
-    print("  - Zip the repo root including .git/")
-    print("  - Do not include .env or storage/resumes/")
+    print("  - Run: python scripts/create_submission_zip.py")
+    print("  - Or zip the repo root including .git/")
+    print("  - Do not include .env, .venv/, storage/, or __pycache__/")
     print("  - Upload language: Python")
     print("  - Upload Dockerfile separately if the form requires it")
+    print("  - Keep the GitHub repo private")
     return 0
 
 
