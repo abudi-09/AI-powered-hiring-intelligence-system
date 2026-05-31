@@ -41,7 +41,7 @@ python -m pytest tests/ -v
 python -m pytest tests/ --cov=app --cov-report=term-missing
 ```
 
-Current suite: **153 tests** across services, CRUD validation, API routes, and chat pipeline flows.
+Current suite: **181 tests** (~84% coverage) across services, CRUD validation, API routes, and chat pipeline flows.
 
 Run the pre-upload verifier:
 

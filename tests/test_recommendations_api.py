@@ -116,6 +116,39 @@ async def test_generate_job_recommendations_returns_created_rows(recommendations
 
 
 @pytest.mark.asyncio
+async def test_generate_candidate_recommendations_returns_created_rows(recommendations_client) -> None:
+    client, token = recommendations_client
+    candidate_id = uuid.uuid4()
+    job_id = uuid.uuid4()
+    recommendation = Recommendation(
+        id=uuid.uuid4(),
+        entity_type="candidate",
+        entity_id=candidate_id,
+        recommended_entity_id=job_id,
+        recommendation_type="job_match",
+        rank=1,
+        score=86.0,
+        confidence=79.0,
+        explanation={"summary": "Good role fit"},
+        created_at=datetime.now(timezone.utc),
+    )
+
+    with patch(
+        "app.api.recommendations.recommendation_crud.generate_recommendations_for_candidate",
+        new_callable=AsyncMock,
+        return_value=[recommendation],
+    ):
+        response = await client.post(
+            f"/recommendations/generate/candidate/{candidate_id}?limit=5",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+
+    assert response.status_code == 200
+    assert response.json()["total"] == 1
+    assert response.json()["recommendations"][0]["entity_id"] == str(candidate_id)
+
+
+@pytest.mark.asyncio
 async def test_recommendations_routes_require_authentication() -> None:
     job_id = uuid.uuid4()
     app = create_app()
