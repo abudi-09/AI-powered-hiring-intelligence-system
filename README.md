@@ -25,6 +25,12 @@ alembic upgrade head
 uvicorn app.main:app --reload
 ```
 
+Bootstrap the first admin account after migrations:
+
+```bash
+python scripts/create_admin.py --email admin@example.com --password YourSecurePassword
+```
+
 Interactive API docs: `http://127.0.0.1:8000/docs`
 
 ## Tests
@@ -35,13 +41,15 @@ python -m pytest tests/ -v
 python -m pytest tests/ --cov=app --cov-report=term-missing
 ```
 
-Current suite: **108+ tests**, **~78% coverage** across services, CRUD validation, API routes, and chat pipeline flows.
+Current suite: **153 tests** across services, CRUD validation, API routes, and chat pipeline flows.
 
 Run the pre-upload verifier:
 
 ```bash
 python scripts/verify_submission.py
 ```
+
+CI runs the same pytest suite on push and pull requests (`.github/workflows/ci.yml`).
 
 ## Docker
 
@@ -61,16 +69,37 @@ Run PostgreSQL and the app together:
 docker compose up --build
 ```
 
-Then apply migrations from your host (or an exec shell):
-
-```bash
-alembic upgrade head
-```
+The container entrypoint waits for PostgreSQL, runs `alembic upgrade head`, then starts Uvicorn. Resume uploads persist in the `resume_data` volume.
 
 Health checks:
 
 - Liveness: `GET /health`
 - Readiness: `GET /ready` (includes database connectivity)
+
+## Architecture
+
+```
+Client (JWT) → FastAPI routers → CRUD layer → PostgreSQL
+                    ↓
+              Services (scoring, skill extraction, intelligence engine)
+                    ↓
+              Chat orchestrator (intent → analytics / recommendations / insights)
+```
+
+- **Analytics** (`/analytics/*`) — read-only aggregates: job/candidate stats, skill demand, match distribution
+- **Intelligence** (`/intelligence/*`) — derived hiring metrics and recruiter KPI snapshots backed by `intelligence_engine.py`
+- **Recommendations** (`/recommendations/*`) — ranked candidate/job suggestions stored in the `recommendations` table
+
+## Role matrix
+
+| Role | Typical access |
+|---|---|
+| Admin | Full API access, user management |
+| Recruiter | Candidates, jobs, matches, analytics, chat, recommendations |
+| Hiring Manager | Same as Recruiter for hiring workflows |
+| Candidate | Own profile and application-facing routes only |
+
+Protected routes return `401` without a token, `403` for inactive users or wrong role.
 
 ## Project layout
 
@@ -84,6 +113,7 @@ Health checks:
 | `app/services/intelligence_engine.py` | DB-backed intelligence orchestration |
 | `app/crud/` | Persistence and validation layer |
 | `tests/` | Unit, integration, and API pipeline tests |
+| `scripts/create_admin.py` | Bootstrap first admin/recruiter user |
 | `scripts/verify_submission.py` | Pre-upload sanity checks |
 
 ## Notable endpoints
@@ -97,8 +127,10 @@ Health checks:
 | `POST` | `/candidates/{id}/skills/extract-from-resume` | Extract skills from uploaded resume text |
 | `POST` | `/matches/auto-score` | Score one candidate–job pair |
 | `POST` | `/jobs/{job_id}/matches/auto-score` | Batch score candidates for a job |
+| `GET` | `/analytics/jobs/{job_id}` | Job hiring analytics snapshot |
 | `GET` | `/intelligence/job/{job_id}` | Job hiring difficulty and scarcity metrics |
 | `POST` | `/intelligence/generate/recruiter/{recruiter_id}` | Generate recruiter KPI snapshot |
+| `GET` | `/recommendations/job/{job_id}` | Stored candidate recommendations for a job |
 | `POST` | `/chat/query` | Recruiter assistant with intent routing |
 
 See `/docs` for the full API surface.
@@ -112,6 +144,16 @@ See `/docs` for the full API surface.
 | `ACCESS_TOKEN_EXPIRE_MINUTES` | Token lifetime (default 60) |
 | `RESUME_STORAGE_PATH` | Directory for uploaded resumes |
 | `APP_ENV` | `development` or `production` |
+
+## Troubleshooting
+
+| Symptom | Fix |
+|---|---|
+| `401 Could not validate credentials` | Token expired or `JWT_SECRET_KEY` mismatch between login and server |
+| `403 Inactive user` | Set `is_active=true` on the user row |
+| `403 Insufficient permissions` | Route requires Recruiter/Admin/Hiring Manager role |
+| Docker app exits on start | Check `DATABASE_URL` host is reachable; entrypoint waits up to 60s |
+| Resume upload fails | Ensure `RESUME_STORAGE_PATH` exists and is writable |
 
 ## Silver / AfterQuery upload checklist
 

@@ -20,6 +20,10 @@ REQUIRED_PATHS = (
     "alembic.ini",
     "app/main.py",
     "tests/conftest.py",
+    ".github/workflows/ci.yml",
+    "scripts/create_admin.py",
+    "scripts/docker-entrypoint.sh",
+    "scripts/wait_for_db.py",
 )
 
 FORBIDDEN_TRACKED = (
