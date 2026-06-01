@@ -7,7 +7,6 @@ import argparse
 import subprocess
 import sys
 import zipfile
-from datetime import datetime
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -45,9 +44,22 @@ def should_skip(path: Path) -> bool:
     return False
 
 
-def create_zip(output_path: Path) -> int:
+def folder_name_from_zip(output_path: Path) -> str:
+    """Derive inner folder from zip name, e.g. talentforge-submit.zip -> talentforge."""
+    stem = output_path.stem
+    if stem.endswith("-submit"):
+        return stem[: -len("-submit")]
+    return stem
+
+
+def create_zip(output_path: Path, *, root_folder: str | None = None) -> int:
     if not (ROOT / ".git").exists():
         print("Error: .git/ is missing. Silver requires full git history in the zip.")
+        return 1
+
+    inner = (root_folder or folder_name_from_zip(output_path)).strip("/\\")
+    if not inner:
+        print("Error: inner folder name cannot be empty.")
         return 1
 
     with zipfile.ZipFile(output_path, "w", compression=zipfile.ZIP_DEFLATED) as archive:
@@ -56,21 +68,31 @@ def create_zip(output_path: Path) -> int:
                 continue
             if should_skip(path):
                 continue
-            archive.write(path, path.relative_to(ROOT).as_posix())
+            relative = path.relative_to(ROOT).as_posix()
+            archive.write(path, f"{inner}/{relative}")
 
     print(f"Created {output_path}")
+    print(f"Inner folder: {inner}/")
     print(f"Size: {output_path.stat().st_size / (1024 * 1024):.2f} MB")
     return 0
 
 
+def default_output_name() -> str:
+    return "talentforge-submit.zip"
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="Create a Silver submission zip")
-    default_name = f"AI-Powered-Hiring-Intelligence-Systems-{datetime.now():%Y%m%d}.zip"
     parser.add_argument(
         "-o",
         "--output",
-        default=str(ROOT.parent / default_name),
-        help="Output zip path",
+        default=str(ROOT.parent / default_output_name()),
+        help="Output zip path (default: talentforge-submit.zip)",
+    )
+    parser.add_argument(
+        "--folder",
+        default=None,
+        help="Root folder inside the zip (default: derived from zip name, e.g. talentforge)",
     )
     args = parser.parse_args()
 
@@ -82,7 +104,7 @@ def main() -> int:
         print("Fix verification errors before creating the zip.")
         return verify.returncode
 
-    return create_zip(Path(args.output))
+    return create_zip(Path(args.output), root_folder=args.folder)
 
 
 if __name__ == "__main__":
