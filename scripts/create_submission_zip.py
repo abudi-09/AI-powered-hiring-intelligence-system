@@ -11,6 +11,11 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 
+# Rewrite git metadata in the zip so remote URL matches the branded repo name.
+GIT_REPO_NAME_FROM = "AI-Powered-Hiring-Intelligence-Systems"
+GIT_REPO_NAME_TO = "meridian-platform"
+GITHUB_OWNER = "abudi-09"
+
 EXCLUDE_DIR_NAMES = {
     ".venv",
     "venv",
@@ -45,11 +50,32 @@ def should_skip(path: Path) -> bool:
 
 
 def folder_name_from_zip(output_path: Path) -> str:
-    """Derive inner folder from zip name, e.g. talentforge-submit.zip -> talentforge."""
+    """Derive inner folder from zip name, e.g. meridian-platform-submit.zip -> meridian-platform."""
     stem = output_path.stem
     if stem.endswith("-submit"):
         return stem[: -len("-submit")]
     return stem
+
+
+def rewrite_git_text(content: str) -> str:
+    updated = content.replace(GIT_REPO_NAME_FROM, GIT_REPO_NAME_TO)
+    updated = updated.replace(
+        GIT_REPO_NAME_FROM.lower(),
+        GIT_REPO_NAME_TO,
+    )
+    return updated
+
+
+def read_archive_bytes(path: Path) -> bytes:
+    if ".git" not in path.parts:
+        return path.read_bytes()
+    try:
+        text = path.read_text(encoding="utf-8")
+    except (UnicodeDecodeError, OSError):
+        return path.read_bytes()
+    if GIT_REPO_NAME_FROM not in text and GIT_REPO_NAME_FROM.lower() not in text:
+        return path.read_bytes()
+    return rewrite_git_text(text).encode("utf-8")
 
 
 def create_zip(output_path: Path, *, root_folder: str | None = None) -> int:
@@ -69,16 +95,17 @@ def create_zip(output_path: Path, *, root_folder: str | None = None) -> int:
             if should_skip(path):
                 continue
             relative = path.relative_to(ROOT).as_posix()
-            archive.write(path, f"{inner}/{relative}")
+            archive.writestr(f"{inner}/{relative}", read_archive_bytes(path))
 
     print(f"Created {output_path}")
     print(f"Inner folder: {inner}/")
+    print(f"Git remote in zip: https://github.com/{GITHUB_OWNER}/{GIT_REPO_NAME_TO}.git")
     print(f"Size: {output_path.stat().st_size / (1024 * 1024):.2f} MB")
     return 0
 
 
 def default_output_name() -> str:
-    return "talentforge-submit.zip"
+    return "meridian-platform-submit.zip"
 
 
 def main() -> int:
@@ -87,12 +114,12 @@ def main() -> int:
         "-o",
         "--output",
         default=str(ROOT.parent / default_output_name()),
-        help="Output zip path (default: talentforge-submit.zip)",
+        help="Output zip path (default: meridian-platform-submit.zip)",
     )
     parser.add_argument(
         "--folder",
         default=None,
-        help="Root folder inside the zip (default: derived from zip name, e.g. talentforge)",
+        help="Root folder inside the zip (default: derived from zip name, e.g. meridian-platform)",
     )
     args = parser.parse_args()
 
