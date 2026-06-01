@@ -37,7 +37,7 @@ async def lifespan(app: FastAPI):
 
 
 def create_app() -> FastAPI:
-    app = FastAPI(title="AI Powered Hiring System", lifespan=lifespan)
+    app = FastAPI(title="Meridian Platform API", lifespan=lifespan)
 
     app.add_middleware(
         CORSMiddleware,

@@ -1,4 +1,4 @@
-# AI-Powered Hiring Intelligence Systems
+# Meridian Platform
 
 Personal backend for recruiter-facing hiring analytics: weighted candidate–job matching, resume skill extraction, dashboard intelligence metrics, and a rule-based chat assistant for hiring queries.
 
@@ -160,9 +160,13 @@ See `/docs` for the full API surface.
 Before zipping the repo:
 
 1. Run `python -m pytest` and `python scripts/verify_submission.py`
-2. Confirm `.env` is **not** tracked and not included in the zip
-3. Include the full `.git/` directory for history review
-4. Exclude local artifacts: `.venv/`, `storage/`, `__pycache__/`, `.coverage`
-5. Upload as **Python**; attach `Dockerfile` separately if required by the form
+2. Build the submission archive: `python scripts/create_submission_zip.py`
+3. Confirm `.env` is **not** tracked and not included in the zip
+4. Upload `meridian-platform-submit.zip` (contents live under `meridian-platform/` inside the zip)
+5. Include the full `.git/` directory for history review
+6. Exclude local artifacts: `.venv/`, `storage/`, `__pycache__/`, `.coverage`
+7. Upload as **Python**; attach `Dockerfile` separately if required by the form
+
+Rename the GitHub repository to `meridian-platform` so `git remote` matches the packaged metadata before pushing.
 
 Recommended zip contents: source, tests, Alembic migrations, `Dockerfile`, `docker-compose.yml`, `.env.example`, and `.git/`.

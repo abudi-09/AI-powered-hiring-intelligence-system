@@ -53,7 +53,7 @@ async def test_openapi_document_is_available(api_client: AsyncClient) -> None:
     response = await api_client.get("/openapi.json")
     assert response.status_code == 200
     payload = response.json()
-    assert payload["info"]["title"] == "AI Powered Hiring System"
+    assert payload["info"]["title"] == "Meridian Platform API"
     assert "/auth/login" in payload["paths"]
 
 

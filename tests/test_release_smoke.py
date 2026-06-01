@@ -24,4 +24,4 @@ def test_openapi_documents_core_hiring_surface() -> None:
 
 def test_openapi_title_matches_product_name() -> None:
     schema = create_app().openapi()
-    assert schema["info"]["title"] == "AI Powered Hiring System"
+    assert schema["info"]["title"] == "Meridian Platform API"
