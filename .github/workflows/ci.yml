@@ -20,6 +20,7 @@ jobs:
 
       - name: Run tests
         env:
+          PYTHONPATH: .
           DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/hiring_test
           JWT_SECRET_KEY: ci-secret-key-not-for-production
           APP_ENV: development
