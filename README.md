@@ -1,4 +1,4 @@
-# Meridian Platform
+AI-powered hiring intelligence system
 
 Personal backend for recruiter-facing hiring analytics: weighted candidate–job matching, resume skill extraction, dashboard intelligence metrics, and a rule-based chat assistant for hiring queries.
 
